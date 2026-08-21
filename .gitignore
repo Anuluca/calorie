@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.dev.vars
+work/
+*.log
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/App/Pods/
+mobile/ios/App/Podfile.lock
+

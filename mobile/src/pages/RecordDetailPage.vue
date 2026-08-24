@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   IonAlert,
   IonContent,
@@ -20,6 +20,8 @@ import {
 import { useRoute, useRouter } from "vue-router";
 import { useIntakeStore } from "@/stores/intake";
 import { requestNativeConfirmation } from "@/services/native-bridge";
+import { useNativeConfirmation } from "@/composables/use-native-confirmation";
+import { navigateBack } from "@/services/navigation";
 
 const intake = useIntakeStore();
 const route = useRoute();
@@ -43,8 +45,7 @@ const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
   minute: "2-digit"
 });
 
-function handleNativeConfirmation(event: Event) {
-  const action = (event as CustomEvent<{ action?: string }>).detail?.action ?? "";
+function handleNativeConfirmation(action: string) {
   if (action.startsWith("delete-intake:")) {
     void removeRecord(action.slice("delete-intake:".length));
   }
@@ -52,23 +53,15 @@ function handleNativeConfirmation(event: Event) {
 
 onMounted(() => {
   void intake.load();
-  window.addEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
 });
-
-onBeforeUnmount(() => {
-  window.removeEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
-});
+useNativeConfirmation(handleNativeConfirmation);
 
 function formatDate(value: string) {
   return dateFormatter.format(new Date(`${value}T00:00:00`));
 }
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back();
-    return;
-  }
-  void router.replace("/tabs/records");
+  navigateBack(router, "/tabs/records");
 }
 
 function adjustmentBreakdown(record: { calories: number; increaseCalories?: number; decreaseCalories?: number }) {

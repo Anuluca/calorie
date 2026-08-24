@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   IonContent,
   IonAlert,
@@ -20,6 +20,7 @@ import { useRouter } from "vue-router";
 import { useIntakeStore } from "@/stores/intake";
 import { setNativeOverlayVisible } from "@/services/native-bridge";
 import CalorieTrendChart from "@/components/CalorieTrendChart.vue";
+import { useNativeConfirmation } from "@/composables/use-native-confirmation";
 
 const intake = useIntakeStore();
 const router = useRouter();
@@ -53,25 +54,14 @@ const calibrationNet = computed(() => {
     Math.round(Number(calibrationDecrease.value) || 0);
 });
 
-function handleNativeConfirmation(event: Event) {
-  const action = (event as CustomEvent<{ action?: string }>).detail?.action;
+function handleNativeConfirmation(action: string) {
   if (action === "clear-records" && intake.records.length) void clearRecords();
 }
 
 onMounted(() => {
   void intake.load();
-  window.addEventListener(
-    "native-liquid-glass-confirmation",
-    handleNativeConfirmation
-  );
 });
-
-onBeforeUnmount(() => {
-  window.removeEventListener(
-    "native-liquid-glass-confirmation",
-    handleNativeConfirmation
-  );
-});
+useNativeConfirmation(handleNativeConfirmation);
 
 function formatDate(dateKey: string) {
   return dateFormatter.format(new Date(`${dateKey}T00:00:00`));
@@ -211,8 +201,8 @@ const clearRecordsButtons = [
     <ion-modal
       class="calibration-modal"
       :is-open="calibrationOpen"
-      :initial-breakpoint="0.46"
-      :breakpoints="[0, 0.46]"
+      :initial-breakpoint="0.49"
+      :breakpoints="[0, 0.49]"
       handle-behavior="cycle"
       @will-present="setNativeOverlayVisible(true)"
       @will-dismiss="setNativeOverlayVisible(false)"
@@ -262,7 +252,7 @@ const clearRecordsButtons = [
           </label>
         </div>
 
-        <p v-if="hasCalibrationValue" class="calibration-net">
+        <p class="calibration-net">
           本次净校准
           <strong>{{ calibrationNet > 0 ? "+" : "" }}{{ calibrationNet }} 大卡</strong>
         </p>

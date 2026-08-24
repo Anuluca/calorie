@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { IntakeDaySummary } from "@/types";
+import { toLocalDateKey } from "@/services/intake-domain";
 
 const props = defineProps<{
   days: IntakeDaySummary[];
@@ -12,14 +13,6 @@ const chartTop = 8;
 const chartBottom = 92;
 const selectedIndex = ref<number | null>(null);
 
-function toDateKey(date: Date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0")
-  ].join("-");
-}
-
 const trend = computed(() => {
   const totals = new Map(props.days.map((day) => [day.dateKey, day.totalCalories]));
   const today = new Date();
@@ -28,7 +21,7 @@ const trend = computed(() => {
     const date = new Date(today);
     date.setHours(12, 0, 0, 0);
     date.setDate(today.getDate() - (29 - index));
-    const dateKey = toDateKey(date);
+    const dateKey = toLocalDateKey(date.getTime());
     return {
       dateKey,
       label: `${date.getMonth() + 1}/${date.getDate()}`,

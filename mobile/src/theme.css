@@ -269,8 +269,15 @@ html[data-theme="dark"] .theme-logo.theme-logo-dark {
   margin-bottom: 26px;
 }
 
+@property --search-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .search-panel {
   position: relative;
+  isolation: isolate;
   display: flex;
   min-height: 118px;
   align-items: flex-end;
@@ -281,6 +288,71 @@ html[data-theme="dark"] .theme-logo.theme-logo-dark {
   box-shadow: var(--shadow);
   backdrop-filter: blur(28px) saturate(140%);
   -webkit-backdrop-filter: blur(28px) saturate(140%);
+}
+
+/* 清晰边缘光带与低透明度外发光共享同一旋转色谱。 */
+.search-panel::before,
+.search-panel::after {
+  position: absolute;
+  background: conic-gradient(
+    from var(--search-border-angle),
+    #ff3b30 0deg,
+    #ff9500 58deg,
+    #ffd60a 112deg,
+    #34c759 166deg,
+    #00c7be 216deg,
+    #0a84ff 266deg,
+    #bf5af2 318deg,
+    #ff3b30 360deg
+  );
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transition: opacity 160ms ease;
+}
+
+.search-panel::before {
+  z-index: 2;
+  inset: -1.5px;
+  padding: 2px;
+  border-radius: 29.5px;
+}
+
+.search-panel::after {
+  z-index: 1;
+  inset: -7px;
+  padding: 7px;
+  border-radius: 35px;
+  filter: blur(11px) saturate(135%);
+}
+
+.search-panel-loading {
+  border-color: transparent !important;
+  box-shadow: var(--shadow);
+}
+
+.search-panel-loading::before {
+  opacity: 0.62;
+  animation: search-border-flow 1.8s linear infinite;
+}
+
+.search-panel-loading::after {
+  opacity: 0.3;
+  animation: search-border-flow 1.8s linear infinite;
+}
+
+@keyframes search-border-flow {
+  to {
+    --search-border-angle: 360deg;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -317,6 +389,8 @@ html[data-theme="dark"] .search-panel:focus-within {
 }
 
 .search-panel textarea {
+  position: relative;
+  z-index: 3;
   width: 100%;
   min-height: 72px;
   padding: 0 56px 0 0;
@@ -337,6 +411,7 @@ html[data-theme="dark"] .search-panel:focus-within {
 
 .submit-button {
   position: absolute;
+  z-index: 3;
   right: 14px;
   bottom: 14px;
   display: grid;
@@ -416,7 +491,7 @@ html[data-theme="dark"] .search-panel:focus-within {
 .comparison-result > p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -654,19 +729,22 @@ html[data-theme="dark"] .search-panel:focus-within {
   box-shadow: 0 8px 18px rgba(255, 93, 54, 0.22);
   font-size: 14px;
   font-weight: 630;
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: filter 160ms ease;
 }
 
 .record-result-button:active {
-  transform: scale(0.96);
+  filter: brightness(0.94);
 }
 
 .record-result-button:disabled {
-  opacity: 0.5;
+  opacity: 1;
 }
 
 .record-result-button ion-icon {
+  flex: 0 0 auto;
   font-size: 19px;
+  transform: none;
+  transition: none;
 }
 
 .error-message {
@@ -685,7 +763,7 @@ html[data-theme="dark"] .search-panel:focus-within {
 }
 
 .empty-state p {
-  margin: 16px 0 0;
+  margin: 0;
   font-size: 15px;
 }
 
@@ -696,7 +774,7 @@ html[data-theme="dark"] .search-panel:focus-within {
 
 .search-model-note {
   margin: auto 0 0;
-  padding-top: 28px;
+  padding-top: 14px;
   color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
   font-size: 11px;
   line-height: 1.4;
@@ -705,8 +783,8 @@ html[data-theme="dark"] .search-panel:focus-within {
 
 .empty-icon {
   display: grid;
-  width: 70px;
-  height: 70px;
+  width: 72px;
+  height: 72px;
   place-items: center;
   border: 1px solid var(--surface-border);
   border-radius: 24px;
@@ -715,7 +793,7 @@ html[data-theme="dark"] .search-panel:focus-within {
 }
 
 .empty-icon ion-icon {
-  font-size: 27px;
+  font-size: 48px;
 }
 
 .search-page .empty-icon,
@@ -1104,6 +1182,8 @@ html[data-theme="dark"] .settings-disclaimer {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scale(0.86);
+  transform-origin: center;
 }
 
 .developer-logo picture {
@@ -1149,6 +1229,121 @@ html[data-theme="dark"] .developer-logo {
 .developer-credit-link:active {
   color: var(--accent);
   opacity: 0.72;
+}
+
+.developer-social-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2px;
+}
+
+.developer-social-link {
+  position: relative;
+  display: grid;
+  width: auto;
+  height: 40px;
+  grid-template-columns: 18px minmax(0, 0fr);
+  column-gap: 0;
+  align-items: center;
+  padding: 0 11px;
+  overflow: hidden;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    grid-template-columns 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    column-gap 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.developer-social-link::before {
+  position: absolute;
+  inset: 4px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  opacity: 0;
+  content: "";
+  transform: scale(0.9);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.developer-social-link ion-icon {
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  transition: transform 180ms ease;
+}
+
+.developer-social-link span {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: opacity 160ms ease 50ms, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.developer-social-link:active,
+.developer-social-link:focus-visible {
+  color: var(--accent);
+}
+
+.developer-social-link:active::before,
+.developer-social-link:focus-visible::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.developer-social-link:active ion-icon,
+.developer-social-link:focus-visible ion-icon {
+  transform: scale(1.08);
+}
+
+.developer-social-link:focus-visible {
+  border-radius: 9px;
+  outline: 1px solid var(--accent);
+  outline-offset: -4px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .developer-social-link:hover {
+    grid-template-columns: 18px minmax(0, 1fr);
+    column-gap: 7px;
+    color: var(--accent);
+  }
+
+  .developer-social-link:hover::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .developer-social-link:hover ion-icon {
+    transform: scale(1.08);
+  }
+
+  .developer-social-link:hover span {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .developer-social-link,
+  .developer-social-link::before,
+  .developer-social-link ion-icon,
+  .developer-social-link span {
+    transition: none;
+  }
 }
 
 .record-day-list {
@@ -1990,6 +2185,20 @@ html.ios-native-liquid-glass .native-glass-back-fallback {
   }
 }
 
+/* 手动浅色主题覆盖系统深色媒体查询，网页预览与 Android 保持一致。 */
+html[data-theme="light"] .glass-tab-bar {
+  --background: #eceef2 !important;
+  background: #eceef2 !important;
+}
+
+html.android-native .glass-tab-bar ion-label {
+  font-weight: 700;
+}
+
+html.android-native .glass-tab-bar ion-icon {
+  --ionicon-stroke-width: 42px;
+}
+
 .glass-tab-bar ion-tab-button {
   --background: transparent;
   --color: var(--text-secondary);
@@ -1999,7 +2208,7 @@ html.ios-native-liquid-glass .native-glass-back-fallback {
   position: relative;
   z-index: 1;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 560;
 }
 
@@ -2008,8 +2217,8 @@ html.ios-native-liquid-glass .native-glass-back-fallback {
 }
 
 .glass-tab-bar ion-icon {
-  margin-bottom: 1px;
-  font-size: 21px;
+  margin-bottom: 2px;
+  font-size: 22px;
 }
 
 .tab-highlight {
@@ -2027,15 +2236,36 @@ html.ios-native-liquid-glass .native-glass-back-fallback {
   transition: transform 320ms cubic-bezier(0.22, 0.75, 0.2, 1);
 }
 
-.result-enter-active,
-.result-leave-active {
-  transition: opacity 220ms ease, transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.result-enter-active > .result-card,
+.result-enter-active > .calorie-comparison {
+  transition:
+    opacity 320ms ease,
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 360ms ease-out;
 }
 
-.result-enter-from,
+.result-enter-active > .calorie-comparison {
+  transition-delay: 240ms;
+}
+
+.result-leave-active {
+  transition:
+    opacity 190ms ease,
+    transform 220ms ease,
+    filter 220ms ease;
+}
+
+.result-enter-from > .result-card,
+.result-enter-from > .calorie-comparison {
+  opacity: 0.16;
+  filter: blur(12px);
+  transform: translateY(-30px) scale(0.985);
+}
+
 .result-leave-to {
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
+  opacity: 0.28;
+  filter: blur(12px);
+  transform: scale(0.985);
 }
 
 .sr-only {
@@ -2050,6 +2280,15 @@ html.ios-native-liquid-glass .native-glass-back-fallback {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .search-panel-loading::before,
+  .search-panel-loading::after {
+    animation: none;
+  }
+
+  .result-enter-active > .calorie-comparison {
+    transition-delay: 0ms;
+  }
+
   *,
   *::before,
   *::after {

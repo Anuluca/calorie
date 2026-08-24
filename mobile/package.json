@@ -8,11 +8,11 @@
     "build": "vue-tsc -b && vite build",
     "test": "vitest run",
     "native:sync": "npm run build && cap sync",
+    "apk": "./scripts/build-android-apk.sh",
     "android": "cap open android",
     "ios": "cap open ios"
   },
   "dependencies": {
-    "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/app-launcher": "^8.0.1",

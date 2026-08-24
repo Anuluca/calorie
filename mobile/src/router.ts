@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "@ionic/vue-router";
 import type { RouteLocationNormalized, RouteRecordRaw } from "vue-router";
 import TabsPage from "@/pages/TabsPage.vue";
-import { syncNativeRoute } from "@/services/native-route";
+import { syncNativeRoute } from "@/services/native-bridge";
 
 const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/tabs/search" },

@@ -5,18 +5,41 @@ import { summarizeIntakeDays, toLocalDateKey } from "@/services/intake-domain";
 import type { FoodQueryResult, IntakeRecord } from "@/types";
 
 function createRecordId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}-${crypto.randomUUID()}`;
 }
 
 export const useIntakeStore = defineStore("intake", () => {
   const records = ref<IntakeRecord[]>([]);
   const ready = ref(false);
   const days = computed(() => summarizeIntakeDays(records.value));
+  const recordsByDay = computed(() => {
+    const index = new Map<string, IntakeRecord[]>();
+    for (const record of records.value) {
+      const dayRecords = index.get(record.dateKey);
+      if (dayRecords) dayRecords.push(record);
+      else index.set(record.dateKey, [record]);
+    }
+    for (const dayRecords of index.values()) {
+      dayRecords.sort((left, right) => right.createdAt - left.createdAt);
+    }
+    return index;
+  });
+  let loadPromise: Promise<void> | null = null;
 
   async function load() {
     if (ready.value) return;
-    records.value = await intakeRepository.list();
-    ready.value = true;
+    if (!loadPromise) {
+      loadPromise = intakeRepository
+        .list()
+        .then((storedRecords) => {
+          records.value = storedRecords;
+          ready.value = true;
+        })
+        .finally(() => {
+          loadPromise = null;
+        });
+    }
+    await loadPromise;
   }
 
   async function addFood(result: FoodQueryResult) {
@@ -32,8 +55,8 @@ export const useIntakeStore = defineStore("intake", () => {
       createdAt: now
     };
 
-    records.value = [record, ...records.value];
     await intakeRepository.add(record);
+    records.value = [record, ...records.value];
   }
 
   async function addAdjustment(
@@ -53,24 +76,22 @@ export const useIntakeStore = defineStore("intake", () => {
       createdAt: Date.now()
     };
 
-    records.value = [record, ...records.value];
     await intakeRepository.add(record);
+    records.value = [record, ...records.value];
   }
 
   async function clear() {
-    records.value = [];
     await intakeRepository.clear();
+    records.value = [];
   }
 
   async function remove(id: string) {
-    records.value = records.value.filter((record) => record.id !== id);
     await intakeRepository.remove(id);
+    records.value = records.value.filter((record) => record.id !== id);
   }
 
   function recordsForDay(dateKey: string) {
-    return records.value
-      .filter((record) => record.dateKey === dateKey)
-      .sort((left, right) => right.createdAt - left.createdAt);
+    return recordsByDay.value.get(dateKey) ?? [];
   }
 
   return {

@@ -5,8 +5,9 @@ dist/
 .dev.vars
 work/
 *.log
+outputs/
+worker/.wrangler/
 mobile/android/.gradle/
 mobile/android/local.properties
 mobile/ios/App/Pods/
 mobile/ios/App/Podfile.lock
-

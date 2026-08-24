@@ -1,7 +1,9 @@
 import {
   calculateAiResult,
   feedbackSchema,
+  foodQueryResultSchema,
   requestSchema,
+  safeJson,
   type AiEstimate
 } from "./domain";
 import {
@@ -39,14 +41,18 @@ async function sha256(value: string): Promise<string> {
     .join("");
 }
 
-async function handleFoodQuery(request: Request, env: Env): Promise<Response> {
+async function handleFoodQuery(
+  request: Request,
+  env: Env,
+  context: ExecutionContext
+): Promise<Response> {
   const body = requestSchema.safeParse(await request.json().catch(() => null));
   if (!body.success) {
     return json({ error: "INVALID_QUERY", message: "请输入食物" }, { status: 400 });
   }
 
   const text = body.data.text;
-  // 缓存键包含模型和方案版本，避免复用旧食品库计算结果。
+  // 缓存键包含模型和提示词版本，提示词变更时自动隔离旧估算结果。
   const cacheKey = await sha256(
     `${ZHIPU_MODEL}:${ZHIPU_PROMPT_VERSION}:${text}`
   );
@@ -57,7 +63,25 @@ async function handleFoodQuery(request: Request, env: Env): Promise<Response> {
     .bind(cacheKey, Date.now())
     .first<{ result_json: string }>();
 
-  if (cached) return json(JSON.parse(cached.result_json));
+  if (cached) {
+    const cachedResult = foodQueryResultSchema.safeParse(
+      safeJson(cached.result_json)
+    );
+    if (cachedResult.success) {
+      // 缓存只复用营养估算；每次查询仍生成独立历史 ID 和时间。
+      return json({
+        ...cachedResult.data,
+        id: crypto.randomUUID(),
+        originalQuery: text,
+        createdAt: Date.now()
+      });
+    }
+    context.waitUntil(
+      env.DB.prepare("DELETE FROM query_cache WHERE query_hash = ?1")
+        .bind(cacheKey)
+        .run()
+    );
+  }
 
   let estimate: AiEstimate;
   try {
@@ -89,23 +113,35 @@ async function handleFoodQuery(request: Request, env: Env): Promise<Response> {
 
   const result = calculateAiResult(text, estimate);
 
-  await env.DB
-    .prepare(
-      `INSERT OR REPLACE INTO query_cache
-       (query_hash, result_json, expires_at)
-       VALUES (?1, ?2, ?3)`
-    )
-    .bind(
-      cacheKey,
-      JSON.stringify(result),
-      Date.now() + 7 * 24 * 60 * 60 * 1000
-    )
-    .run();
+  // 缓存写入与过期清理都移到响应之后，避免 D1 往返延迟阻塞查询结果。
+  context.waitUntil(
+    Promise.all([
+      env.DB
+        .prepare(
+          `INSERT OR REPLACE INTO query_cache
+           (query_hash, result_json, expires_at)
+           VALUES (?1, ?2, ?3)`
+        )
+        .bind(
+          cacheKey,
+          JSON.stringify(result),
+          Date.now() + 7 * 24 * 60 * 60 * 1000
+        )
+        .run(),
+      env.DB.prepare("DELETE FROM query_cache WHERE expires_at <= ?1")
+        .bind(Date.now())
+        .run()
+    ]).catch((error) => console.error("Query cache maintenance failed", error))
+  );
 
   return json(result);
 }
 
-async function handleFeedback(request: Request, env: Env): Promise<Response> {
+async function handleFeedback(
+  request: Request,
+  env: Env,
+  context: ExecutionContext
+): Promise<Response> {
   const installId = request.headers.get("x-install-id")?.trim() ?? "";
   if (!/^[a-zA-Z0-9-]{16,80}$/.test(installId)) {
     return json({ error: "INVALID_INSTALL", message: "反馈来源无效" }, { status: 400 });
@@ -136,6 +172,12 @@ async function handleFeedback(request: Request, env: Env): Promise<Response> {
     return json({ error: "RATE_LIMITED", message: "今天的反馈次数已用完" }, { status: 429 });
   }
 
+  context.waitUntil(
+    env.DB.prepare("DELETE FROM feedback_rate_limits WHERE updated_at < ?1")
+      .bind(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      .run()
+  );
+
   try {
     await env.FEEDBACK_EMAIL.send({
       to: "tilucario@outlook.com",
@@ -157,7 +199,11 @@ async function handleFeedback(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    context: ExecutionContext
+  ): Promise<Response> {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
@@ -169,11 +215,11 @@ export default {
     }
 
     if (request.method === "POST" && pathname === "/v1/food/query") {
-      return handleFoodQuery(request, env);
+      return handleFoodQuery(request, env, context);
     }
 
     if (request.method === "POST" && pathname === "/v1/feedback") {
-      return handleFeedback(request, env);
+      return handleFeedback(request, env, context);
     }
 
     return json({ error: "NOT_FOUND" }, { status: 404 });

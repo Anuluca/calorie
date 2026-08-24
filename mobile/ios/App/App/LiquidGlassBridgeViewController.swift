@@ -358,11 +358,12 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
 
     @available(iOS 26.0, *)
     private func updateTheme(_ theme: String) {
-        switch theme {
-        case "light": overrideUserInterfaceStyle = .light
-        case "dark": overrideUserInterfaceStyle = .dark
-        default: overrideUserInterfaceStyle = .unspecified
-        }
+        let interfaceStyle = NativeThemePreference.interfaceStyle(for: theme)
+        let backgroundColor = NativeThemePreference.backgroundColor(for: interfaceStyle)
+        overrideUserInterfaceStyle = interfaceStyle
+        view.window?.overrideUserInterfaceStyle = interfaceStyle
+        view.backgroundColor = backgroundColor
+        view.window?.backgroundColor = backgroundColor
         setNeedsStatusBarAppearanceUpdate()
     }
 

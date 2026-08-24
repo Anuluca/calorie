@@ -1,2 +1,0 @@
-b3435323970d7f3d3979314c898c754156178918472a5f459a605883c41b8b66  outputs/calorie-ai-demo-debug.apk
-e8f7472903d88fcfd423ba917d0ba0e922e897db2d09a7afdef562fe088a1bdf  outputs/calorie-ai-demo-source.zip

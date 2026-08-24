@@ -24,12 +24,22 @@ type NativeWindow = Window & {
   };
 };
 
-function postNativeMessage(message: NativeBridgeMessage): boolean {
+function postNativeMessage(
+  message: NativeBridgeMessage,
+  requireReadyMarker = true
+): boolean {
   const nativeWindow = window as NativeWindow;
   const handler = nativeWindow.webkit?.messageHandlers?.liquidGlassNavigation;
-  if (!nativeWindow.__iosNativeLiquidGlass || !handler) return false;
+  if ((requireReadyMarker && !nativeWindow.__iosNativeLiquidGlass) || !handler) {
+    return false;
+  }
   handler.postMessage(message);
   return true;
+}
+
+/** 路由初始化可能早于 iOS 能力标记，因此只检测消息处理器。 */
+export function syncNativeRoute(path: string): boolean {
+  return postNativeMessage({ type: "route", path }, false);
 }
 
 export function setNativeOverlayVisible(visible: boolean) {
@@ -58,4 +68,3 @@ export function requestNativeConfirmation(options: {
 export function showNativeToast(message: string): boolean {
   return postNativeMessage({ type: "toast", message });
 }
-

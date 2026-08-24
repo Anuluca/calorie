@@ -22,8 +22,16 @@ export function retainRecentIntakeRecords(
 ): IntakeRecord[] {
   const cutoff = intakeCutoffDateKey(todayKey);
   return records.filter(
-    (record) => record.dateKey >= cutoff && record.dateKey <= todayKey
+    (record) => isDateKeyInRange(record.dateKey, cutoff, todayKey)
   );
+}
+
+function isDateKeyInRange(
+  dateKey: string,
+  cutoffDateKey: string,
+  todayKey: string
+): boolean {
+  return dateKey >= cutoffDateKey && dateKey <= todayKey;
 }
 
 /**
@@ -33,39 +41,36 @@ export function summarizeIntakeDays(
   records: IntakeRecord[],
   todayKey = toLocalDateKey()
 ): IntakeDaySummary[] {
-  const groups = new Map<string, IntakeRecord[]>();
+  const summaries = new Map<string, IntakeDaySummary>();
+  const cutoff = intakeCutoffDateKey(todayKey);
 
-  for (const record of retainRecentIntakeRecords(records, todayKey)) {
-    const group = groups.get(record.dateKey) ?? [];
-    group.push(record);
-    groups.set(record.dateKey, group);
+  for (const record of records) {
+    if (!isDateKeyInRange(record.dateKey, cutoff, todayKey)) continue;
+    let summary = summaries.get(record.dateKey);
+    if (!summary) {
+      summary = {
+        dateKey: record.dateKey,
+        totalCalories: 0,
+        foodCalories: 0,
+        adjustmentCalories: 0,
+        foodNames: [],
+        recordCount: 0,
+        isToday: record.dateKey === todayKey
+      };
+      summaries.set(record.dateKey, summary);
+    }
+
+    summary.totalCalories += record.calories;
+    summary.recordCount += 1;
+    if (record.kind === "food") {
+      summary.foodCalories += record.calories;
+      summary.foodNames.push(record.name);
+    } else {
+      summary.adjustmentCalories += record.calories;
+    }
   }
 
-  return [...groups.entries()]
-    .sort(([left], [right]) => right.localeCompare(left))
-    .slice(0, INTAKE_RETENTION_DAYS)
-    .map(([dateKey, dayRecords]) => {
-      const foodRecords = dayRecords.filter((record) => record.kind === "food");
-      const adjustmentRecords = dayRecords.filter(
-        (record) => record.kind === "adjustment"
-      );
-      const foodCalories = foodRecords.reduce(
-        (total, record) => total + record.calories,
-        0
-      );
-      const adjustmentCalories = adjustmentRecords.reduce(
-        (total, record) => total + record.calories,
-        0
-      );
-
-      return {
-        dateKey,
-        totalCalories: foodCalories + adjustmentCalories,
-        foodCalories,
-        adjustmentCalories,
-        foodNames: foodRecords.map((record) => record.name),
-        recordCount: dayRecords.length,
-        isToday: dateKey === todayKey
-      };
-    });
+  return [...summaries.values()]
+    .sort((left, right) => right.dateKey.localeCompare(left.dateKey))
+    .slice(0, INTAKE_RETENTION_DAYS);
 }

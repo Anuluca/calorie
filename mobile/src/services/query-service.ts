@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { FoodQueryResult } from "@/types";
 
 // 与 Worker 中实际调用的模型保持一致，用于在查询页向用户明确说明。
-export const AI_MODEL_DISPLAY_NAME = "智谱 GLM-4.7-Flash";
+export const AI_MODEL_DISPLAY_NAME = "智谱 GLM-4-Flash";
 
 export const resultSchema = z.object({
   id: z.string(),

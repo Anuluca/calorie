@@ -1,8 +1,8 @@
 {
   "fill" : {
     "linear-gradient" : [
-      "display-p3:0.96994,0.98244,0.95702,1.00000",
-      "display-p3:0.96783,0.94216,0.86705,1.00000"
+      "display-p3:1.00000,1.00000,1.00000,1.00000",
+      "display-p3:1.00000,1.00000,1.00000,1.00000"
     ],
     "orientation" : {
       "start" : {
@@ -26,9 +26,9 @@
           "image-name" : "CalorieAI-Foreground.png",
           "name" : "CalorieAI-Foreground",
           "position" : {
-            "scale" : 0.67,
+            "scale" : 0.69,
             "translation-in-points" : [
-              0,
+              -4,
               -18
             ]
           }
@@ -39,8 +39,8 @@
         "opacity" : 0.5
       },
       "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+        "enabled" : false,
+        "value" : 0
       }
     }
   ],

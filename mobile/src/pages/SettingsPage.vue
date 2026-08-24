@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { AppLauncher } from "@capacitor/app-launcher";
 import { Capacitor } from "@capacitor/core";
 import { IonAlert, IonContent, IonIcon, IonModal, IonPage, IonToast } from "@ionic/vue";
@@ -8,6 +8,9 @@ import {
   chevronForwardOutline,
   documentTextOutline,
   informationCircleOutline,
+  logoGithub,
+  logoWechat,
+  mailOutline,
   moonOutline,
   sunnyOutline
 } from "ionicons/icons";
@@ -21,6 +24,7 @@ import {
 import { loadTheme, saveTheme, type AppTheme } from "@/services/theme";
 import { useHistoryStore } from "@/stores/history";
 import { useIntakeStore } from "@/stores/intake";
+import { useNativeConfirmation } from "@/composables/use-native-confirmation";
 
 const history = useHistoryStore();
 const intake = useIntakeStore();
@@ -34,7 +38,8 @@ const feedbackTitle = ref("");
 const feedbackContent = ref("");
 const feedbackSending = ref(false);
 const feedbackError = ref("");
-const feedbackToastOpen = ref(false);
+const notificationToastOpen = ref(false);
+const notificationToastMessage = ref("");
 
 const themeOptions: { value: AppTheme; label: string }[] = [
   { value: "system", label: "跟随系统" },
@@ -53,19 +58,14 @@ const cacheSize = computed(() => {
 });
 
 onMounted(async () => {
-  window.addEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
   const [, , savedTheme] = await Promise.all([history.load(), intake.load(), loadTheme()]);
   theme.value = savedTheme;
 });
 
-onBeforeUnmount(() => {
-  window.removeEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
-});
-
-function handleNativeConfirmation(event: Event) {
-  const action = (event as CustomEvent<{ action?: string }>).detail?.action;
+function handleNativeConfirmation(action: string) {
   if (action === "clear-cache") void clearCache();
 }
+useNativeConfirmation(handleNativeConfirmation);
 
 function requestClearCache() {
   if (!cacheCount.value || clearing.value) return;
@@ -118,7 +118,7 @@ async function submitFeedback() {
   try {
     await sendFeedback(feedbackTitle.value, feedbackContent.value);
     feedbackOpen.value = false;
-    if (!showNativeToast("反馈已发送")) feedbackToastOpen.value = true;
+    showNotification("反馈已发送");
   } catch (cause) {
     feedbackError.value = cause instanceof Error ? cause.message : "反馈发送失败";
   } finally {
@@ -126,13 +126,50 @@ async function submitFeedback() {
   }
 }
 
-async function openDeveloperSite() {
-  const url = "https://anuluca.com";
+function showNotification(message: string) {
+  if (showNativeToast(message)) return;
+  notificationToastMessage.value = message;
+  notificationToastOpen.value = true;
+}
+
+async function openExternalUrl(url: string) {
   if (Capacitor.isNativePlatform()) {
     await AppLauncher.openUrl({ url });
     return;
   }
   window.open(url, "_blank", "noopener,noreferrer");
+}
+
+async function openDeveloperSite() {
+  await openExternalUrl("https://anuluca.com");
+}
+
+async function openGithub() {
+  await openExternalUrl("https://github.com/Anuluca");
+}
+
+async function copyWechatId() {
+  const wechatId = "anugamine";
+
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(wechatId);
+    } else {
+      // 兼容不提供 Clipboard API 的旧版 WebView。
+      const textarea = document.createElement("textarea");
+      textarea.value = wechatId;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    showNotification("微信号 anugamine 已复制");
+  } catch {
+    // 即使系统拒绝剪贴板权限，也明确展示微信号，便于用户手动添加。
+    showNotification("微信号：anugamine");
+  }
 }
 </script>
 
@@ -245,6 +282,37 @@ async function openDeveloperSite() {
             DEVELOPED &amp; DESIGNED BY<br />
             © 2026 Anuluca.
           </button>
+
+          <nav class="developer-social-links" aria-label="开发者外部链接">
+            <button
+              type="button"
+              class="developer-social-link"
+              aria-label="访问 Anuluca 的 GitHub"
+              @click="openGithub"
+            >
+              <ion-icon :icon="logoGithub" aria-hidden="true" />
+              <span aria-hidden="true">GITHUB</span>
+            </button>
+
+            <a
+              class="developer-social-link"
+              href="mailto:tilucario@outlook.com"
+              aria-label="发送邮件至 tilucario@outlook.com"
+            >
+              <ion-icon :icon="mailOutline" aria-hidden="true" />
+              <span aria-hidden="true">MAIL</span>
+            </a>
+
+            <button
+              type="button"
+              class="developer-social-link"
+              aria-label="复制微信号 anugamine"
+              @click="copyWechatId"
+            >
+              <ion-icon :icon="logoWechat" aria-hidden="true" />
+              <span aria-hidden="true">WECHAT</span>
+            </button>
+          </nav>
         </footer>
       </main>
     </ion-content>
@@ -304,11 +372,11 @@ async function openDeveloperSite() {
     </ion-modal>
 
     <ion-toast
-      :is-open="feedbackToastOpen"
-      message="反馈已发送"
+      :is-open="notificationToastOpen"
+      :message="notificationToastMessage"
       position="top"
       :duration="1400"
-      @did-dismiss="feedbackToastOpen = false"
+      @did-dismiss="notificationToastOpen = false"
     />
   </ion-page>
 </template>

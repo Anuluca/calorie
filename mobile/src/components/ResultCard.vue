@@ -47,10 +47,11 @@ const confidenceLabel = computed(() => {
         type="button"
         class="record-result-button"
         :disabled="recording"
+        :aria-busy="recording"
         @click="emit('record')"
       >
         <ion-icon :icon="addOutline" aria-hidden="true" />
-        {{ recording ? "记录中…" : "记录" }}
+        记录
       </button>
     </div>
   </article>

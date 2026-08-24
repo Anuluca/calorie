@@ -69,6 +69,7 @@ const comparisonLocked = computed(
 function focusQuery() {
   void nextTick(() => {
     window.setTimeout(() => {
+      if (router.currentRoute.value.path !== "/tabs/search") return;
       const input = queryInput.value;
       input?.focus({ preventScroll: true });
       // 自动聚焦时若已有内容，直接全选，方便用户输入下一次查询。
@@ -77,11 +78,19 @@ function focusQuery() {
   });
 }
 
+function focusQueryWhenReady() {
+  if (document.documentElement.classList.contains("startup-splash-active")) {
+    window.addEventListener("startup-splash-dismissed", focusQuery, { once: true });
+    return;
+  }
+  focusQuery();
+}
+
 onMounted(async () => {
   await Promise.all([history.load(), intake.load()]);
-  focusQuery();
+  focusQueryWhenReady();
 
-  window.addEventListener("app-resumed-to-search", focusQuery);
+  window.addEventListener("app-resumed-to-search", focusQueryWhenReady);
 });
 
 async function recordLatestResult() {
@@ -106,7 +115,8 @@ async function toggleComparisonLock() {
 }
 
 onBeforeUnmount(() => {
-  window.removeEventListener("app-resumed-to-search", focusQuery);
+  window.removeEventListener("startup-splash-dismissed", focusQuery);
+  window.removeEventListener("app-resumed-to-search", focusQueryWhenReady);
 });
 
 async function submit(text = query.value) {
@@ -165,7 +175,12 @@ async function submit(text = query.value) {
           </button>
         </header>
 
-        <form class="search-panel" @submit.prevent="submit()">
+        <form
+          class="search-panel"
+          :class="{ 'search-panel-loading': loading }"
+          :aria-busy="loading"
+          @submit.prevent="submit()"
+        >
           <label class="sr-only" for="food-query">食物名称和份量</label>
           <textarea
             id="food-query"
@@ -190,8 +205,17 @@ async function submit(text = query.value) {
 
         <p v-if="error" class="error-message" role="alert">{{ error }}</p>
 
-        <transition name="result">
-          <section v-if="result" class="result-stack" aria-live="polite">
+        <transition
+          name="result"
+          mode="out-in"
+          :duration="{ enter: 680, leave: 220 }"
+        >
+          <section
+            v-if="result"
+            :key="result.id"
+            class="result-stack"
+            aria-live="polite"
+          >
             <result-card
               :result="result"
               :recording="recording"

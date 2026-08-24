@@ -35,6 +35,22 @@ export const feedbackSchema = z.object({
   content: z.string().trim().min(1).max(2000)
 });
 
+/** Worker 响应和 D1 缓存共用同一份边界 Schema，避免读取损坏或旧版缓存。 */
+export const foodQueryResultSchema = z.object({
+  id: z.string().min(1),
+  originalQuery: z.string(),
+  foodId: z.null(),
+  name: z.string().min(1),
+  quantityText: z.string(),
+  grams: z.number().nonnegative(),
+  calories: z.number().nonnegative(),
+  calorieMin: z.number().nonnegative(),
+  calorieMax: z.number().nonnegative(),
+  confidence: z.enum(["high", "medium", "low"]),
+  source: z.literal("cloud"),
+  createdAt: z.number().nonnegative()
+});
+
 export function calculateAiResult(
   originalQuery: string,
   estimate: AiEstimate,
@@ -47,7 +63,7 @@ export function calculateAiResult(
   const calories = Math.round((estimate.kcalPer100g * grams) / 100);
   const ratio = estimate.uncertaintyPercent / 100;
 
-  return {
+  return foodQueryResultSchema.parse({
     id,
     originalQuery,
     foodId: null,
@@ -60,7 +76,7 @@ export function calculateAiResult(
     confidence: estimate.confidence,
     source: "cloud" as const,
     createdAt: now
-  };
+  });
 }
 
 export function safeJson(value: unknown): unknown {

@@ -44,9 +44,47 @@ describe("estimateFoodWithZhipu", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const request = fetchMock.mock.calls[0];
-    const body = JSON.parse(String(request?.[1]?.body)) as Record<string, unknown>;
+    const body = JSON.parse(String(request?.[1]?.body)) as {
+      model: string;
+      response_format: { type: string };
+      thinking: { type: string };
+      max_tokens: number;
+      messages: Array<{ role: string; content: string }>;
+    };
     expect(body.model).toBe(ZHIPU_MODEL);
     expect(body.response_format).toEqual({ type: "json_object" });
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.max_tokens).toBe(96);
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0]).toMatchObject({ role: "user" });
+    expect(body.messages[0]?.content.length).toBeLessThan(600);
+  });
+
+  it("normalizes minor JSON field issues without a second AI request", async () => {
+    const fetcher = vi.fn(async () =>
+      apiResponse(
+        JSON.stringify({
+          recognized: true,
+          foodName: "青椒肉丝盖饭",
+          quantityText: "一份",
+          grams: "350",
+          totalCalories: "520",
+          confidence: "unknown"
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const result = await estimateFoodWithZhipu(
+      "test-key",
+      "一份青椒肉丝盖饭",
+      fetcher
+    );
+
+    expect(result.grams).toBe(350);
+    expect(result.kcalPer100g).toBeCloseTo(148.57, 2);
+    expect(result.confidence).toBe("medium");
+    expect(result.uncertaintyPercent).toBe(25);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("keeps explicit weight confidence and supports zero calories", async () => {
@@ -161,30 +199,15 @@ describe("estimateFoodWithZhipu", () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects soup-sized hot dry noodles and corrects the estimate", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValueOnce(
+  it("corrects an implausible hot dry noodle estimate locally", async () => {
+    const fetcher = vi.fn(async () =>
         apiResponse(
           JSON.stringify({
             recognized: true,
-            foodName: "热干面",
-            quantityText: "一碗",
-            grams: 600,
-            totalCalories: 1500,
-            confidence: "medium",
-            uncertaintyPercent: 20
-          })
-        )
-      )
-      .mockResolvedValueOnce(
-        apiResponse(
-          JSON.stringify({
-            recognized: true,
-            foodName: "热干面",
+            foodName: "红油热干面",
             quantityText: "一碗",
             grams: 300,
-            totalCalories: 555,
+            totalCalories: 4,
             confidence: "medium",
             uncertaintyPercent: 20
           })
@@ -193,13 +216,13 @@ describe("estimateFoodWithZhipu", () => {
 
     const result = await estimateFoodWithZhipu(
       "test-key",
-      "一碗热干面",
+      "红油热干面",
       fetcher
     );
 
     expect(result.grams).toBe(300);
-    expect((result.grams * result.kcalPer100g) / 100).toBe(555);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect((result.grams * result.kcalPer100g) / 100).toBe(600);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("maps rate limits to a typed error", async () => {

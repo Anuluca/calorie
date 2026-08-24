@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import {
   IonAlert,
   IonContent,
@@ -15,6 +15,8 @@ import { useRouter } from "vue-router";
 import HistoryCard from "@/components/HistoryCard.vue";
 import { useHistoryStore } from "@/stores/history";
 import { requestNativeConfirmation } from "@/services/native-bridge";
+import { useNativeConfirmation } from "@/composables/use-native-confirmation";
+import { navigateBack } from "@/services/navigation";
 
 const history = useHistoryStore();
 const router = useRouter();
@@ -22,8 +24,7 @@ const clearAlertOpen = ref(false);
 const deleteAlertOpen = ref(false);
 const pendingDeleteId = ref("");
 
-function handleNativeConfirmation(event: Event) {
-  const action = (event as CustomEvent<{ action?: string }>).detail?.action ?? "";
+function handleNativeConfirmation(action: string) {
   if (action === "clear-history") {
     void history.clear();
   } else if (action.startsWith("delete-history:")) {
@@ -33,19 +34,11 @@ function handleNativeConfirmation(event: Event) {
 
 onMounted(() => {
   void history.load();
-  window.addEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
 });
-
-onBeforeUnmount(() => {
-  window.removeEventListener("native-liquid-glass-confirmation", handleNativeConfirmation);
-});
+useNativeConfirmation(handleNativeConfirmation);
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back();
-    return;
-  }
-  void router.replace("/tabs/search");
+  navigateBack(router, "/tabs/search");
 }
 
 function requestClearHistory() {

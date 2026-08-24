@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   aiEstimateSchema,
   calculateAiResult,
-  feedbackSchema
+  feedbackSchema,
+  foodQueryResultSchema
 } from "../src/domain";
 
 describe("calculateAiResult", () => {
@@ -48,6 +49,14 @@ describe("calculateAiResult", () => {
         kcalPer100g: 0
       }).calories
     ).toBe(0);
+  });
+
+  it("rejects corrupted cached query results", () => {
+    const result = calculateAiResult("两个水煮鸡蛋", estimate, 1, "test-id");
+    expect(foodQueryResultSchema.safeParse(result).success).toBe(true);
+    expect(
+      foodQueryResultSchema.safeParse({ ...result, calories: -1 }).success
+    ).toBe(false);
   });
 });
 

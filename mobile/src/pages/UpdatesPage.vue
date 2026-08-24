@@ -2,15 +2,12 @@
 import { IonContent, IonIcon, IonPage } from "@ionic/vue";
 import { arrowBackOutline } from "ionicons/icons";
 import { useRouter } from "vue-router";
+import { navigateBack } from "@/services/navigation";
 
 const router = useRouter();
 
 function goBack() {
-  if (window.history.length > 1) {
-    router.back();
-    return;
-  }
-  void router.replace("/tabs/settings");
+  navigateBack(router, "/tabs/settings");
 }
 </script>
 

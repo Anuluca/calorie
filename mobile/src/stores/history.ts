@@ -10,58 +10,71 @@ export const useHistoryStore = defineStore("history", () => {
   const items = ref<FoodQueryResult[]>([]);
   const lockedComparison = ref<FoodQueryResult | null>(null);
   const ready = ref(false);
+  let loadPromise: Promise<void> | null = null;
 
   const count = computed(() => items.value.length);
 
   async function load() {
     if (ready.value) return;
-    const [storedItems, lockResult] = await Promise.all([
-      historyRepository.list(),
-      Preferences.get({ key: comparisonLockKey })
-    ]);
-    items.value = storedItems;
-    try {
-      lockedComparison.value = lockResult.value
-        ? (JSON.parse(lockResult.value) as FoodQueryResult)
-        : null;
-    } catch {
-      lockedComparison.value = null;
-      await Preferences.remove({ key: comparisonLockKey });
+    if (!loadPromise) {
+      loadPromise = (async () => {
+        const [storedItems, lockResult] = await Promise.all([
+          historyRepository.list(),
+          Preferences.get({ key: comparisonLockKey })
+        ]);
+        items.value = storedItems;
+        try {
+          lockedComparison.value = lockResult.value
+            ? (JSON.parse(lockResult.value) as FoodQueryResult)
+            : null;
+        } catch {
+          lockedComparison.value = null;
+          await Preferences.remove({ key: comparisonLockKey });
+        }
+        ready.value = true;
+      })().finally(() => {
+        loadPromise = null;
+      });
     }
-    ready.value = true;
+    await loadPromise;
   }
 
   async function add(item: FoodQueryResult) {
-    items.value = [item, ...items.value.filter((value) => value.id !== item.id)].slice(0, 200);
     await historyRepository.add(item);
+    items.value = [item, ...items.value.filter((value) => value.id !== item.id)].slice(0, 200);
   }
 
   async function clear() {
-    items.value = [];
-    lockedComparison.value = null;
     await Promise.all([
       historyRepository.clear(),
       Preferences.remove({ key: comparisonLockKey })
     ]);
+    items.value = [];
+    lockedComparison.value = null;
   }
 
   async function remove(id: string) {
+    const removesLock = lockedComparison.value?.id === id;
+    await Promise.all([
+      historyRepository.remove(id),
+      removesLock
+        ? Preferences.remove({ key: comparisonLockKey })
+        : Promise.resolve()
+    ]);
     items.value = items.value.filter((item) => item.id !== id);
-    if (lockedComparison.value?.id === id) {
+    if (removesLock) {
       lockedComparison.value = null;
-      await Preferences.remove({ key: comparisonLockKey });
     }
-    await historyRepository.remove(id);
   }
 
   async function lockComparison(item: FoodQueryResult) {
-    lockedComparison.value = item;
     await Preferences.set({ key: comparisonLockKey, value: JSON.stringify(item) });
+    lockedComparison.value = item;
   }
 
   async function unlockComparison() {
-    lockedComparison.value = null;
     await Preferences.remove({ key: comparisonLockKey });
+    lockedComparison.value = null;
   }
 
   return {

@@ -18,7 +18,12 @@ const preferencesBackend: HistoryBackend = {
     if (!value) return [];
 
     try {
-      return JSON.parse(value) as FoodQueryResult[];
+      const parsed = JSON.parse(value) as FoodQueryResult[];
+      const retained = parsed.slice(0, 200);
+      if (retained.length !== parsed.length) {
+        await Preferences.set({ key: storageKey, value: JSON.stringify(retained) });
+      }
+      return retained;
     } catch {
       return [];
     }
@@ -60,8 +65,22 @@ async function createNativeBackend(): Promise<HistoryBackend> {
     );
   `);
 
+  async function pruneHistoryRows() {
+    const result = await db.query(
+      "SELECT id FROM food_history ORDER BY created_at DESC"
+    );
+    const excessIds = (result.values ?? [])
+      .slice(200)
+      .map((row) => String(row.id));
+
+    for (const id of excessIds) {
+      await db.run("DELETE FROM food_history WHERE id = ?", [id]);
+    }
+  }
+
   return {
     async list() {
+      await pruneHistoryRows();
       const result = await db.query(
         "SELECT payload FROM food_history ORDER BY created_at DESC LIMIT 200"
       );
@@ -78,6 +97,8 @@ async function createNativeBackend(): Promise<HistoryBackend> {
         "INSERT OR REPLACE INTO food_history (id, payload, created_at) VALUES (?, ?, ?)",
         [item.id, JSON.stringify(item), item.createdAt]
       );
+      // 查询历史上限为 200 条，同时清理 SQLite 中不再展示的旧记录。
+      await pruneHistoryRows();
     },
     async remove(id) {
       await db.run("DELETE FROM food_history WHERE id = ?", [id]);

@@ -1,7 +1,19 @@
 {
   "images" : [
     {
-      "filename" : "AppIcon-512@2x.png",
+      "filename" : "CalorieAI-AppIcon-Light.png",
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "CalorieAI-AppIcon-v2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

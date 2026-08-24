@@ -35,15 +35,14 @@ const confidenceLabel = computed(() => {
 
     <div class="energy-value">
       <strong>{{ result.calories }}</strong>
-      <span>千卡</span>
+      <span>大卡</span>
     </div>
 
-    <div class="range-row">
-      <span>可能范围</span>
-      <strong>{{ result.calorieMin }}–{{ result.calorieMax }} 千卡</strong>
-    </div>
-
-    <div class="result-actions">
+    <div class="result-footer">
+      <div class="range-row">
+        <span>可能范围</span>
+        <strong>{{ result.calorieMin }}–{{ result.calorieMax }} 大卡</strong>
+      </div>
       <button
         type="button"
         class="record-result-button"

@@ -15,9 +15,16 @@
   "observability": {
     "enabled": true
   },
-  "ai": {
-    "binding": "AI"
+  "secrets": {
+    "required": ["ZHIPU_API_KEY"]
   },
+  "send_email": [
+    {
+      "name": "FEEDBACK_EMAIL",
+      "destination_address": "tilucario@outlook.com",
+      "allowed_sender_addresses": ["feedback@anuluca.com"]
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

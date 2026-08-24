@@ -32,6 +32,10 @@ export interface CalorieAdjustmentRecord {
   dateKey: string;
   /** 正数表示增加，负数表示减少。 */
   calories: number;
+  /** 本次校准填写的增加值；旧数据可能不存在。 */
+  increaseCalories?: number;
+  /** 本次校准填写的减少值；旧数据可能不存在。 */
+  decreaseCalories?: number;
   note: string;
   createdAt: number;
 }

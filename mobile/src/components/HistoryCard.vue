@@ -19,8 +19,7 @@ const formatter = new Intl.DateTimeFormat("zh-CN", {
     </div>
     <div class="history-energy">
       <strong>{{ item.calories }}</strong>
-      <span>千卡</span>
+      <span>大卡</span>
     </div>
   </article>
 </template>
-

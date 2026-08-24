@@ -36,12 +36,19 @@ export const useIntakeStore = defineStore("intake", () => {
     await intakeRepository.add(record);
   }
 
-  async function addAdjustment(dateKey: string, calories: number, note: string) {
+  async function addAdjustment(
+    dateKey: string,
+    increaseCalories: number,
+    decreaseCalories: number,
+    note: string
+  ) {
     const record: IntakeRecord = {
       id: createRecordId("adjustment"),
       kind: "adjustment",
       dateKey,
-      calories,
+      calories: increaseCalories - decreaseCalories,
+      increaseCalories,
+      decreaseCalories,
       note: note.trim() || "热量校准",
       createdAt: Date.now()
     };
@@ -50,11 +57,31 @@ export const useIntakeStore = defineStore("intake", () => {
     await intakeRepository.add(record);
   }
 
+  async function clear() {
+    records.value = [];
+    await intakeRepository.clear();
+  }
+
+  async function remove(id: string) {
+    records.value = records.value.filter((record) => record.id !== id);
+    await intakeRepository.remove(id);
+  }
+
   function recordsForDay(dateKey: string) {
     return records.value
       .filter((record) => record.dateKey === dateKey)
       .sort((left, right) => right.createdAt - left.createdAt);
   }
 
-  return { records, ready, days, load, addFood, addAdjustment, recordsForDay };
+  return {
+    records,
+    ready,
+    days,
+    load,
+    addFood,
+    addAdjustment,
+    clear,
+    remove,
+    recordsForDay
+  };
 });

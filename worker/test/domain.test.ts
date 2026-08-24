@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   aiEstimateSchema,
-  calculateAiResult
+  calculateAiResult,
+  feedbackSchema
 } from "../src/domain";
 
 describe("calculateAiResult", () => {
@@ -35,5 +36,28 @@ describe("calculateAiResult", () => {
     expect(() =>
       aiEstimateSchema.parse({ ...estimate, grams: 0 })
     ).toThrow();
+  });
+
+  it("accepts a recognized zero-calorie drink", () => {
+    expect(
+      calculateAiResult("500毫升水", {
+        ...estimate,
+        foodName: "水",
+        quantityText: "500毫升",
+        grams: 500,
+        kcalPer100g: 0
+      }).calories
+    ).toBe(0);
+  });
+});
+
+describe("feedbackSchema", () => {
+  it("accepts a valid feedback message", () => {
+    expect(feedbackSchema.parse({ title: "无法保存", content: "点击记录后没有反应" }))
+      .toEqual({ title: "无法保存", content: "点击记录后没有反应" });
+  });
+
+  it("rejects a subject containing a newline", () => {
+    expect(() => feedbackSchema.parse({ title: "问题\n抄送", content: "内容" })).toThrow();
   });
 });

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   IonIcon,
   IonLabel,
@@ -13,18 +13,58 @@ import {
 import { journalOutline, searchOutline, settingsOutline } from "ionicons/icons";
 
 const route = useRoute();
+const router = useRouter();
 const tabs = ["search", "records", "settings"];
 const activeIndex = computed(() => {
   const segments = route.path.split("/");
   const currentTab = String(segments[segments.length - 1]);
   return Math.max(0, tabs.indexOf(currentTab));
 });
+
+type ScrollableIonContent = HTMLElement & {
+  scrollToTop: (duration?: number) => Promise<void>;
+};
+
+/**
+ * Ionic 会缓存各个 Tab 页面，因此切换路由时原页面的滚动位置也会被保留。
+ * 等目标页面完成激活后，定位当前可见页面的 ion-content 并立即回到顶部。
+ */
+async function scrollActiveTabToTop() {
+  await nextTick();
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const activePage = document.querySelector(
+        ".tab-router-outlet > ion-page:not(.ion-page-hidden)"
+      );
+      const content = activePage?.querySelector<ScrollableIonContent>("ion-content");
+      void content?.scrollToTop(0);
+    });
+  });
+}
+
+watch(
+  () => route.path,
+  (path, previousPath) => {
+    if (path === previousPath || !tabs.some((tab) => path === `/tabs/${tab}`)) return;
+    void scrollActiveTabToTop();
+  },
+  { flush: "post" }
+);
+
+function handleNativeTab(event: Event) {
+  const tab = (event as CustomEvent<{ tab?: string }>).detail?.tab;
+  if (!tab || !tabs.includes(tab)) return;
+  void router.push(`/tabs/${tab}`);
+}
+
+onMounted(() => window.addEventListener("native-liquid-glass-tab", handleNativeTab));
+onBeforeUnmount(() => window.removeEventListener("native-liquid-glass-tab", handleNativeTab));
 </script>
 
 <template>
   <ion-page>
     <ion-tabs>
-      <ion-router-outlet class="tab-router-outlet" />
+      <ion-router-outlet class="tab-router-outlet" :animated="false" />
       <ion-tab-bar slot="bottom" class="glass-tab-bar">
         <span
           class="tab-highlight"

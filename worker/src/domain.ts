@@ -15,7 +15,7 @@ export const aiEstimateSchema = z
   .refine(
     (value) =>
       !value.recognized ||
-      (value.foodName.length > 0 && value.grams > 0 && value.kcalPer100g > 0),
+      (value.foodName.length > 0 && value.grams > 0 && value.kcalPer100g >= 0),
     { message: "识别成功时必须返回有效的食品营养估算" }
   );
 
@@ -23,6 +23,16 @@ export type AiEstimate = z.infer<typeof aiEstimateSchema>;
 
 export const requestSchema = z.object({
   text: z.string().trim().min(1).max(200)
+});
+
+export const feedbackSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .refine((value) => !/[\r\n]/.test(value), "标题不能包含换行"),
+  content: z.string().trim().min(1).max(2000)
 });
 
 export function calculateAiResult(

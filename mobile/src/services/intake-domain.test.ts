@@ -18,6 +18,8 @@ const records: IntakeRecord[] = [
     kind: "adjustment",
     dateKey: "2026-08-21",
     calories: -180,
+    increaseCalories: 20,
+    decreaseCalories: 200,
     note: "公园跑步",
     createdAt: 3
   },
@@ -26,6 +28,8 @@ const records: IntakeRecord[] = [
     kind: "adjustment",
     dateKey: "2026-08-21",
     calories: 50,
+    increaseCalories: 80,
+    decreaseCalories: 30,
     note: "补充估算",
     createdAt: 4
   }
@@ -42,21 +46,32 @@ describe("intake day summaries", () => {
     });
   });
 
-  it("keeps only the most recent 30 recorded days", () => {
-    const manyDays: IntakeRecord[] = Array.from({ length: 31 }, (_, index) => ({
+  it("keeps only the most recent 60 calendar days", () => {
+    const today = new Date("2026-08-21T12:00:00");
+    const manyDays: IntakeRecord[] = Array.from({ length: 61 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - index);
+      const dateKey = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0")
+      ].join("-");
+
+      return {
       id: `food-${index}`,
       kind: "food" as const,
-      dateKey: `2026-07-${String(index + 1).padStart(2, "0")}`,
+      dateKey,
       name: "测试食物",
       quantityText: "1份",
       calories: 100,
       sourceResultId: `query-${index}`,
       createdAt: index
-    }));
+      };
+    });
 
     const summaries = summarizeIntakeDays(manyDays, "2026-08-21");
-    expect(summaries).toHaveLength(30);
-    expect(summaries[0]!.dateKey).toBe("2026-07-31");
-    expect(summaries[summaries.length - 1]!.dateKey).toBe("2026-07-02");
+    expect(summaries).toHaveLength(60);
+    expect(summaries[0]!.dateKey).toBe("2026-08-21");
+    expect(summaries[summaries.length - 1]!.dateKey).toBe("2026-06-23");
   });
 });

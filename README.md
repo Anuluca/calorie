@@ -1,6 +1,6 @@
 # 热量快查 Demo
 
-Vue 3、Ionic Vue、Capacitor、Cloudflare Workers AI 和 D1 实现的 iOS/Android 热量查询 Demo。
+Vue 3、Ionic Vue、Capacitor、Cloudflare Workers、智谱 GLM-4.7-Flash 和 D1 实现的 iOS/Android 热量查询 Demo。
 
 当前 Demo API：`https://calorie-api.tilucario.workers.dev`
 
@@ -9,7 +9,8 @@ Vue 3、Ionic Vue、Capacitor、Cloudflare Workers AI 和 D1 实现的 iOS/Andro
 ## 功能
 
 - 中文食物和份量查询
-- 完全由 Workers AI 识别食物并估算份量和热量
+- 由智谱 GLM-4.7-Flash 识别食物并估算份量和热量
+- 整份成品热量估算、结构化输出校验和服务端确定性换算
 - 本地 SQLite 历史；Web 开发环境自动使用 Preferences
 - 结构化输出校验和热量区间计算
 - D1 AI 结果缓存
@@ -35,13 +36,24 @@ cp mobile/.env.example mobile/.env
 VITE_API_BASE_URL=http://localhost:8787
 ```
 
-## Cloudflare 初始化
+## 智谱与 Cloudflare 初始化
 
-不要把 Cloudflare API Token 或模型密钥写进仓库。
+不要把 Cloudflare API Token 或智谱 API Key 写进仓库。
+
+在智谱开放平台创建 API Key。本地开发时新建 `worker/.dev.vars`：
+
+```text
+ZHIPU_API_KEY=你的智谱API Key
+```
+
+`.dev.vars` 已被 Git 忽略。生产环境使用 Cloudflare Secret，不要把密钥写入 `wrangler.jsonc`。先登录 Cloudflare，再设置密钥并初始化 D1：
 
 ```bash
+cd worker
 npx wrangler login
+npx wrangler secret put ZHIPU_API_KEY
 npx wrangler d1 create calorie-foods
+cd ..
 ```
 
 把 `wrangler d1 create` 返回的数据库 ID 写入 `worker/wrangler.jsonc`，然后执行：
@@ -52,6 +64,19 @@ npm run worker:deploy
 ```
 
 将部署地址写入 `mobile/.env` 后重新构建客户端。
+
+### Bug 反馈邮件
+
+反馈接口通过 Cloudflare Email Service 的 `FEEDBACK_EMAIL` 绑定发送邮件。部署前需要：
+
+1. 在 Cloudflare Email Service 中启用 `anuluca.com` 发件域，并允许 `feedback@anuluca.com`。
+2. 将 `tilucario@outlook.com` 添加为已验证的目标地址。
+3. 先运行 D1 迁移，再部署 Worker：
+
+```bash
+npm run db:migrate:remote --workspace worker
+npm run worker:deploy
+```
 
 ## 原生工程
 

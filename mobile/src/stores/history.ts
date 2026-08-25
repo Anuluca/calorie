@@ -1,7 +1,11 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { Preferences } from "@capacitor/preferences";
-import { historyRepository } from "@/services/history-repository";
+import {
+  HISTORY_LIMIT,
+  historyRepository
+} from "@/services/history-repository";
+import { createSerialTaskQueue } from "@/services/serial-task-queue";
 import type { FoodQueryResult } from "@/types";
 
 const comparisonLockKey = "calorie-comparison-lock-v1";
@@ -11,6 +15,7 @@ export const useHistoryStore = defineStore("history", () => {
   const lockedComparison = ref<FoodQueryResult | null>(null);
   const ready = ref(false);
   let loadPromise: Promise<void> | null = null;
+  const enqueueMutation = createSerialTaskQueue();
 
   const count = computed(() => items.value.length);
 
@@ -40,41 +45,58 @@ export const useHistoryStore = defineStore("history", () => {
   }
 
   async function add(item: FoodQueryResult) {
-    await historyRepository.add(item);
-    items.value = [item, ...items.value.filter((value) => value.id !== item.id)].slice(0, 200);
+    await enqueueMutation(async () => {
+      await load();
+      const next = [item, ...items.value.filter((value) => value.id !== item.id)]
+        .slice(0, HISTORY_LIMIT);
+      await historyRepository.save(next);
+      items.value = next;
+    });
   }
 
   async function clear() {
-    await Promise.all([
-      historyRepository.clear(),
-      Preferences.remove({ key: comparisonLockKey })
-    ]);
-    items.value = [];
-    lockedComparison.value = null;
+    await enqueueMutation(async () => {
+      await load();
+      await Promise.all([
+        historyRepository.clear(),
+        Preferences.remove({ key: comparisonLockKey })
+      ]);
+      items.value = [];
+      lockedComparison.value = null;
+      ready.value = true;
+    });
   }
 
   async function remove(id: string) {
-    const removesLock = lockedComparison.value?.id === id;
-    await Promise.all([
-      historyRepository.remove(id),
-      removesLock
-        ? Preferences.remove({ key: comparisonLockKey })
-        : Promise.resolve()
-    ]);
-    items.value = items.value.filter((item) => item.id !== id);
-    if (removesLock) {
-      lockedComparison.value = null;
-    }
+    await enqueueMutation(async () => {
+      await load();
+      const removesLock = lockedComparison.value?.id === id;
+      const next = items.value.filter((item) => item.id !== id);
+      await Promise.all([
+        historyRepository.save(next),
+        removesLock
+          ? Preferences.remove({ key: comparisonLockKey })
+          : Promise.resolve()
+      ]);
+      items.value = next;
+      if (removesLock) lockedComparison.value = null;
+    });
   }
 
   async function lockComparison(item: FoodQueryResult) {
-    await Preferences.set({ key: comparisonLockKey, value: JSON.stringify(item) });
-    lockedComparison.value = item;
+    await enqueueMutation(async () => {
+      await load();
+      await Preferences.set({ key: comparisonLockKey, value: JSON.stringify(item) });
+      lockedComparison.value = item;
+    });
   }
 
   async function unlockComparison() {
-    await Preferences.remove({ key: comparisonLockKey });
-    lockedComparison.value = null;
+    await enqueueMutation(async () => {
+      await load();
+      await Preferences.remove({ key: comparisonLockKey });
+      lockedComparison.value = null;
+    });
   }
 
   return {

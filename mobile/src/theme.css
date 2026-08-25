@@ -112,6 +112,11 @@ button {
     linear-gradient(160deg, var(--app-bg), var(--app-bg-secondary));
 }
 
+/* Android 系统栏与页面共用同一底色，不在上下边缘保留任何渐变。 */
+html.android-native .app-content {
+  --background: var(--app-bg);
+}
+
 /* 内容在屏幕上下边缘柔和淡出，避免滚动区域产生生硬截断。 */
 .app-content::part(scroll) {
   -webkit-mask-image: linear-gradient(
@@ -128,6 +133,12 @@ button {
     #000 calc(100% - 32px),
     transparent 100%
   );
+}
+
+/* Android 内容已延伸到系统栏，淡出蒙版会在上下造成额外色差。 */
+html.android-native .app-content::part(scroll) {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .page-shell {
@@ -288,6 +299,7 @@ html[data-theme="dark"] .theme-logo.theme-logo-dark {
   box-shadow: var(--shadow);
   backdrop-filter: blur(28px) saturate(140%);
   -webkit-backdrop-filter: blur(28px) saturate(140%);
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
 /* 清晰边缘光带与低透明度外发光共享同一旋转色谱。 */
@@ -388,12 +400,41 @@ html[data-theme="dark"] .search-panel:focus-within {
   border-color: rgba(235, 235, 245, 0.2);
 }
 
+/* 按住语音按钮时使用主题色边框、淡色背景和持续呼吸光晕反馈当前正在收音。 */
+html .search-panel.search-panel-voice-active {
+  border-color: color-mix(in srgb, var(--accent) 76%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow:
+    var(--shadow),
+    0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 34%, transparent);
+  animation: voice-panel-glow 1.05s ease-in-out infinite alternate;
+}
+
+@keyframes voice-panel-glow {
+  from {
+    border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+    box-shadow:
+      var(--shadow),
+      0 0 0 2px color-mix(in srgb, var(--accent) 13%, transparent),
+      0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  to {
+    border-color: color-mix(in srgb, var(--accent) 94%, transparent);
+    box-shadow:
+      var(--shadow),
+      0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent),
+      0 0 30px color-mix(in srgb, var(--accent) 46%, transparent);
+  }
+}
+
 .search-panel textarea {
   position: relative;
   z-index: 3;
   width: 100%;
   min-height: 72px;
-  padding: 0 56px 0 0;
+  padding: 0 108px 0 0;
   resize: none;
   border: 0;
   outline: 0;
@@ -402,6 +443,90 @@ html[data-theme="dark"] .search-panel:focus-within {
   font-size: 20px;
   font-weight: 520;
   line-height: 1.45;
+}
+
+.voice-button {
+  position: absolute;
+  z-index: 3;
+  right: 68px;
+  bottom: 14px;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  background: transparent;
+  box-shadow: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 140ms ease, color 160ms ease, background 160ms ease,
+    box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.voice-button:active,
+.voice-button-active {
+  transform: scale(0.92);
+}
+
+.voice-button-active {
+  color: white;
+  border-color: transparent;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 7px var(--accent-soft),
+    0 9px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .voice-button:not(.voice-button-active) {
+    color: rgba(235, 235, 245, 0.8);
+  }
+}
+
+html[data-theme="dark"] .voice-button:not(.voice-button-active) {
+  color: rgba(235, 235, 245, 0.8);
+}
+
+html[data-theme="light"] .voice-button:not(.voice-button-active) {
+  color: var(--text-secondary);
+}
+
+.voice-button:disabled {
+  opacity: 0.34;
+  box-shadow: none;
+}
+
+.voice-button ion-icon {
+  font-size: 27px;
+}
+
+.voice-button ion-spinner {
+  width: 20px;
+  height: 20px;
+}
+
+.voice-pulse {
+  position: absolute;
+  inset: -1px;
+  border: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  border-radius: inherit;
+  animation: voice-pulse 1.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes voice-pulse {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.55);
+  }
 }
 
 .search-panel textarea::placeholder {
@@ -747,13 +872,6 @@ html[data-theme="dark"] .search-panel:focus-within {
   transition: none;
 }
 
-.error-message {
-  margin: 22px 4px 0;
-  color: var(--accent);
-  font-size: 15px;
-  font-weight: 560;
-}
-
 .empty-state {
   display: grid;
   min-height: 240px;
@@ -896,16 +1014,6 @@ html[data-theme="dark"] .search-panel:focus-within {
 .history-energy span {
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.text-button {
-  min-height: 38px;
-  padding: 0 8px;
-  border: 0;
-  color: var(--accent);
-  background: transparent;
-  font-size: 16px;
-  font-weight: 560;
 }
 
 .settings-information {
@@ -1585,14 +1693,6 @@ html[data-theme="dark"] .developer-logo {
   gap: 2px;
 }
 
-.record-day-footer {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .record-adjustment-summary {
   width: fit-content;
   padding: 4px 8px;
@@ -1646,7 +1746,19 @@ html[data-theme="dark"] .developer-logo {
 }
 
 .native-glass-button.record-day-calibration-button {
-  --background: #f0f0f4;
+  --background: color-mix(
+    in srgb,
+    var(--surface-opaque) 38%,
+    var(--app-bg-secondary)
+  );
+  --background-activated: color-mix(
+    in srgb,
+    var(--accent) 18%,
+    var(--surface-opaque)
+  );
+  --background-focused: var(--background-activated);
+  --border-color: var(--surface-border);
+  --color: var(--text-primary);
   --box-shadow: none;
 }
 
@@ -1670,6 +1782,10 @@ html[data-theme="dark"] .developer-logo {
     linear-gradient(160deg, var(--app-bg), var(--app-bg-secondary));
 }
 
+html.android-native .calibration-sheet {
+  background: var(--app-bg);
+}
+
 .calibration-sheet > header {
   display: flex;
   align-items: center;
@@ -1688,17 +1804,6 @@ html[data-theme="dark"] .developer-logo {
   margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
-}
-
-.modal-close-button {
-  flex: 0 0 auto;
-  min-width: 76px;
-  height: 48px;
-  margin: 0;
-  --color: var(--accent);
-  --padding-start: 18px;
-  --padding-end: 18px;
-  font-size: 14px;
 }
 
 .calibration-values {
@@ -2018,6 +2123,10 @@ html[data-theme="dark"] .developer-logo {
     linear-gradient(160deg, var(--app-bg), var(--app-bg-secondary));
 }
 
+html.android-native .feedback-sheet {
+  background: var(--app-bg);
+}
+
 .feedback-sheet > header {
   display: flex;
   align-items: center;
@@ -2191,6 +2300,29 @@ html[data-theme="light"] .glass-tab-bar {
   background: #eceef2 !important;
 }
 
+/* Android 菜单栏提高实色度，避免页面内容透出后影响图标和文字辨识度。 */
+html.android-native .glass-tab-bar {
+  --background: rgba(246, 247, 249, 0.94);
+  background: rgba(246, 247, 249, 0.94);
+}
+
+@media (prefers-color-scheme: dark) {
+  html.android-native .glass-tab-bar {
+    --background: rgba(24, 27, 32, 0.94);
+    background: rgba(24, 27, 32, 0.94);
+  }
+}
+
+html.android-native[data-theme="light"] .glass-tab-bar {
+  --background: rgba(246, 247, 249, 0.96) !important;
+  background: rgba(246, 247, 249, 0.96) !important;
+}
+
+html.android-native[data-theme="dark"] .glass-tab-bar {
+  --background: rgba(24, 27, 32, 0.96) !important;
+  background: rgba(24, 27, 32, 0.96) !important;
+}
+
 html.android-native .glass-tab-bar ion-label {
   font-weight: 700;
 }
@@ -2279,9 +2411,32 @@ html.android-native .glass-tab-bar ion-icon {
   border: 0;
 }
 
+/* Toast 的文字和图标跟随应用主题：浅色为黑色，暗色为白色。 */
+ion-toast.app-toast {
+  --color: var(--text-primary);
+}
+
+/* Android Toast 将图标与文字作为一个整体居中，保持与 iOS 原生提示一致。 */
+html.android-native ion-toast.app-toast::part(container) {
+  justify-content: center;
+}
+
+html.android-native ion-toast.app-toast::part(content) {
+  flex: 0 1 auto;
+}
+
+html.android-native ion-toast.app-toast::part(message) {
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .search-panel-voice-active,
   .search-panel-loading::before,
   .search-panel-loading::after {
+    animation: none;
+  }
+
+  .voice-pulse {
     animation: none;
   }
 

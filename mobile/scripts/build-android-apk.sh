@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# 构建与商店生产配置一致的 Android Release APK 和 AAB。
-# APK 未签名，AAB 由 Google Play App Signing 在上架时签名。
+# 构建与生产配置一致、经过 R8 压缩的 Android Release APK 和 AAB。
+# 当前 APK 使用本机 Android 测试证书签名以便真机安装；上架前必须换成正式发布密钥。
 
 set -Eeuo pipefail
 
@@ -11,8 +11,8 @@ android_dir="$mobile_dir/android"
 apk_source="$android_dir/app/build/outputs/apk/release/app-release-unsigned.apk"
 aab_source="$android_dir/app/build/outputs/bundle/release/app-release.aab"
 output_dir="$mobile_dir/outputs/android"
-apk_output="$output_dir/calorie-ai-release-unsigned.apk"
-aab_output="$output_dir/calorie-ai-release.aab"
+apk_output="$output_dir/calorie-ai-release.apk"
+aab_output="$output_dir/calorie-ai-release-unsigned.aab"
 
 log() {
   printf '\n[%s] %s\n' "APK" "$1"
@@ -51,6 +51,15 @@ fi
 [[ -d "$android_sdk/platforms/android-36" ]] || \
   fail "缺少 Android SDK Platform 36。"
 
+build_tools_dir="$android_sdk/build-tools/36.0.0"
+[[ -x "$build_tools_dir/zipalign" && -x "$build_tools_dir/apksigner" ]] || \
+  fail "缺少 Android SDK Build-Tools 36.0.0。"
+
+# 未配置正式发布密钥时，用 Android 默认测试证书签名 Release 构建，确保 APK 可直接安装。
+test_keystore="$HOME/.android/debug.keystore"
+[[ -f "$test_keystore" ]] || \
+  fail "未找到 Android 测试签名文件：$test_keystore"
+
 export ANDROID_HOME="$android_sdk"
 export ANDROID_SDK_ROOT="$android_sdk"
 
@@ -71,9 +80,17 @@ cd "$android_dir"
 [[ -f "$apk_source" ]] || fail "Gradle 已结束，但没有找到 APK 文件。"
 [[ -f "$aab_source" ]] || fail "Gradle 已结束，但没有找到 AAB 文件。"
 
-# 复制到固定位置，后续每次执行都会用最新 APK 覆盖旧文件。
+# 对压缩后的 Release APK 执行对齐和测试签名，产物可直接安装到 Android 真机。
 mkdir -p "$output_dir"
-cp "$apk_source" "$apk_output"
+"$build_tools_dir/zipalign" -f -p 4 "$apk_source" "$apk_output"
+"$build_tools_dir/apksigner" sign \
+  --ks "$test_keystore" \
+  --ks-key-alias androiddebugkey \
+  --ks-pass pass:android \
+  --key-pass pass:android \
+  --v4-signing-enabled false \
+  "$apk_output"
+"$build_tools_dir/apksigner" verify --verbose "$apk_output"
 cp "$aab_source" "$aab_output"
 
 apk_size="$(du -h "$apk_output" | awk '{print $1}')"
@@ -82,5 +99,5 @@ aab_size="$(du -h "$aab_output" | awk '{print $1}')"
 aab_hash="$(shasum -a 256 "$aab_output" | awk '{print $1}')"
 
 log "打包完成"
-printf 'APK：%s\n大小：%s\nSHA-256：%s\n' "$apk_output" "$apk_size" "$apk_hash"
+printf '可安装 Release APK：%s\n大小：%s\nSHA-256：%s\n' "$apk_output" "$apk_size" "$apk_hash"
 printf 'AAB：%s\n大小：%s\nSHA-256：%s\n' "$aab_output" "$aab_size" "$aab_hash"

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17132" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
-    <device id="retina4_7" orientation="portrait" appearance="light"/>
+    <device id="retina4_7" orientation="portrait" appearance="dark"/>
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="17105"/>
@@ -38,9 +38,9 @@
         </scene>
     </scenes>
     <resources>
-        <image name="Splash" width="1254" height="1254"/>
+        <image name="Splash" width="168" height="168"/>
         <namedColor name="SplashBackground">
-            <color red="0.953" green="0.957" blue="0.965" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.031" green="0.039" blue="0.051" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

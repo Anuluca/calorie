@@ -11,6 +11,7 @@ import {
   fileTrayOutline,
   lockClosedOutline,
   lockOpenOutline,
+  micOutline,
   searchOutline,
   timeOutline
 } from "ionicons/icons";
@@ -22,7 +23,9 @@ import {
 } from "@/services/calorie-comparison";
 import { useHistoryStore } from "@/stores/history";
 import { useIntakeStore } from "@/stores/intake";
-import { showNativeToast } from "@/services/native-bridge";
+import { useAppToast } from "@/composables/use-app-toast";
+import { useVoiceQuery } from "@/composables/use-voice-query";
+import { showAndroidKeyboard } from "@/services/native-bridge";
 import type { FoodQueryResult } from "@/types";
 import ResultCard from "@/components/ResultCard.vue";
 
@@ -34,10 +37,28 @@ const query = ref("");
 const result = ref<FoodQueryResult | null>(null);
 const previousResult = ref<FoodQueryResult | null>(null);
 const loading = ref(false);
-const error = ref("");
 const recording = ref(false);
-const recordToastOpen = ref(false);
 const comparisonMode = ref<"serving" | "weight">("serving");
+const appToast = useAppToast();
+const {
+  state: voiceState,
+  holding: voiceHolding,
+  active: voiceActive,
+  buttonLabel: voiceButtonLabel,
+  cancel: cancelVoiceInput,
+  handlePointerDown: handleVoicePointerDown,
+  handlePointerUp: handleVoicePointerUp,
+  handleKeyDown: handleVoiceKeyDown,
+  handleKeyUp: handleVoiceKeyUp
+} = useVoiceQuery({
+  disabled: () => loading.value,
+  blurInput: () => queryInput.value?.blur(),
+  updateQuery: (value) => {
+    query.value = value;
+  },
+  submit,
+  notify: appToast.show
+});
 
 const comparisonValues = computed(() => {
   if (!previousResult.value || !result.value) return null;
@@ -68,13 +89,12 @@ const comparisonLocked = computed(
 
 function focusQuery() {
   void nextTick(() => {
-    window.setTimeout(() => {
-      if (router.currentRoute.value.path !== "/tabs/search") return;
-      const input = queryInput.value;
-      input?.focus({ preventScroll: true });
-      // 自动聚焦时若已有内容，直接全选，方便用户输入下一次查询。
-      if (input?.value) input.select();
-    }, 120);
+    if (router.currentRoute.value.path !== "/tabs/search") return;
+    const input = queryInput.value;
+    input?.focus({ preventScroll: true });
+    // 自动聚焦时若已有内容，直接全选，方便用户输入下一次查询。
+    if (input?.value) input.select();
+    if (input) showAndroidKeyboard();
   });
 }
 
@@ -99,7 +119,7 @@ async function recordLatestResult() {
   recording.value = true;
   try {
     await intake.addFood(result.value);
-    if (!showNativeToast("已记录")) recordToastOpen.value = true;
+    appToast.show("已记录", "success");
   } finally {
     recording.value = false;
   }
@@ -128,7 +148,6 @@ async function submit(text = query.value) {
 
   query.value = value;
   loading.value = true;
-  error.value = "";
 
   try {
     const nextResult = await queryFood(value);
@@ -146,7 +165,8 @@ async function submit(text = query.value) {
       console.error("Failed to save query history", historyError);
     }
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : "查询失败";
+    const message = cause instanceof Error ? cause.message : "查询失败";
+    appToast.show(message, "error", 1800);
   } finally {
     loading.value = false;
   }
@@ -177,7 +197,10 @@ async function submit(text = query.value) {
 
         <form
           class="search-panel"
-          :class="{ 'search-panel-loading': loading }"
+          :class="{
+            'search-panel-loading': loading,
+            'search-panel-voice-active': voiceHolding
+          }"
           :aria-busy="loading"
           @submit.prevent="submit()"
         >
@@ -193,17 +216,33 @@ async function submit(text = query.value) {
             @keydown.enter.exact.prevent="submit()"
           />
           <button
+            class="voice-button"
+            :class="{ 'voice-button-active': voiceActive }"
+            type="button"
+            :disabled="loading"
+            :aria-label="voiceButtonLabel"
+            :aria-pressed="voiceActive"
+            @pointerdown="handleVoicePointerDown"
+            @pointerup="handleVoicePointerUp"
+            @pointercancel="cancelVoiceInput"
+            @keydown="handleVoiceKeyDown"
+            @keyup="handleVoiceKeyUp"
+            @contextmenu.prevent
+          >
+            <span v-if="voiceActive" class="voice-pulse" aria-hidden="true" />
+            <ion-spinner v-if="voiceState === 'preparing' || voiceState === 'recognizing'" name="crescent" />
+            <ion-icon v-else :icon="micOutline" aria-hidden="true" />
+          </button>
+          <button
             class="submit-button"
             type="submit"
-            :disabled="!query.trim() || loading"
+            :disabled="!query.trim() || loading || voiceActive"
             aria-label="查询热量"
           >
             <ion-spinner v-if="loading" name="crescent" />
             <ion-icon v-else :icon="searchOutline" aria-hidden="true" />
           </button>
         </form>
-
-        <p v-if="error" class="error-message" role="alert">{{ error }}</p>
 
         <transition
           name="result"
@@ -286,7 +325,7 @@ async function submit(text = query.value) {
           </section>
         </transition>
 
-        <div v-if="!result && !error" class="empty-state">
+        <div v-if="!result" class="empty-state">
           <div class="empty-icon" aria-hidden="true">
             <ion-icon :icon="fileTrayOutline" />
           </div>
@@ -297,11 +336,13 @@ async function submit(text = query.value) {
       </main>
     </ion-content>
     <ion-toast
-      :is-open="recordToastOpen"
-      message="已记录"
+      class="app-toast"
+      :is-open="appToast.isOpen.value"
+      :icon="appToast.icon.value"
+      :message="appToast.message.value"
       position="top"
-      :duration="1400"
-      @did-dismiss="recordToastOpen = false"
+      :duration="appToast.duration.value"
+      @did-dismiss="appToast.dismiss"
     />
   </ion-page>
 </template>

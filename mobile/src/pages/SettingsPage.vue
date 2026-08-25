@@ -18,9 +18,9 @@ import { useRouter } from "vue-router";
 import { sendFeedback } from "@/services/feedback-service";
 import {
   requestNativeConfirmation,
-  setNativeOverlayVisible,
-  showNativeToast
+  setNativeOverlayVisible
 } from "@/services/native-bridge";
+import { useAppToast } from "@/composables/use-app-toast";
 import { loadTheme, saveTheme, type AppTheme } from "@/services/theme";
 import { useHistoryStore } from "@/stores/history";
 import { useIntakeStore } from "@/stores/intake";
@@ -38,8 +38,7 @@ const feedbackTitle = ref("");
 const feedbackContent = ref("");
 const feedbackSending = ref(false);
 const feedbackError = ref("");
-const notificationToastOpen = ref(false);
-const notificationToastMessage = ref("");
+const appToast = useAppToast();
 
 const themeOptions: { value: AppTheme; label: string }[] = [
   { value: "system", label: "跟随系统" },
@@ -127,9 +126,7 @@ async function submitFeedback() {
 }
 
 function showNotification(message: string) {
-  if (showNativeToast(message)) return;
-  notificationToastMessage.value = message;
-  notificationToastOpen.value = true;
+  appToast.show(message, "success");
 }
 
 async function openExternalUrl(url: string) {
@@ -372,11 +369,13 @@ async function copyWechatId() {
     </ion-modal>
 
     <ion-toast
-      :is-open="notificationToastOpen"
-      :message="notificationToastMessage"
+      class="app-toast"
+      :is-open="appToast.isOpen.value"
+      :icon="appToast.icon.value"
+      :message="appToast.message.value"
       position="top"
-      :duration="1400"
-      @did-dismiss="notificationToastOpen = false"
+      :duration="appToast.duration.value"
+      @did-dismiss="appToast.dismiss"
     />
   </ion-page>
 </template>

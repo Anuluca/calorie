@@ -37,24 +37,37 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
     private var nativeTabBottomConstraint: NSLayoutConstraint?
     private var currentPath = "/tabs/search"
     private var webOverlayVisible = false
+    private var webStartupReady = false
+    private var pendingTheme = NativeThemePreference.storedTheme
+    private var startupCoverView: UIView?
     private weak var nativeToastView: UIView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        guard #available(iOS 26.0, *) else { return }
         configureWebBridge()
-        configureNativeTabBar()
-        configureNativeHeaderButtons()
-        observeKeyboardFrameChanges()
-        updateRoute("/tabs/search")
+
+        // WKWebView 创建 HTML 画布前会短暂显示自身背景，这一层也必须固定为暗色。
+        let startupBackground = NativeThemePreference.backgroundColor(for: .dark)
+        view.backgroundColor = startupBackground
+        webView?.backgroundColor = startupBackground
+        webView?.scrollView.backgroundColor = startupBackground
+
+        if #available(iOS 26.0, *) {
+            configureNativeTabBar()
+            configureNativeHeaderButtons()
+            observeKeyboardFrameChanges()
+            updateRoute("/tabs/search")
+        }
+
+        // 承接系统 LaunchScreen，避免它结束后 Logo 消失，再由 Web 开屏重新出现。
+        configureStartupCover()
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
     }
 
-    @available(iOS 26.0, *)
     private func configureWebBridge() {
         let userContentController = webView?.configuration.userContentController
         userContentController?.add(self, name: messageHandlerName)
@@ -68,6 +81,64 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
             WKUserScript(source: source, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         )
         webView?.evaluateJavaScript(source)
+    }
+
+    private func configureStartupCover() {
+        let cover = UIView()
+        cover.translatesAutoresizingMaskIntoConstraints = false
+        cover.backgroundColor = NativeThemePreference.backgroundColor(for: .dark)
+        cover.isUserInteractionEnabled = true
+
+        let logo = UIImageView(image: UIImage(named: "Splash"))
+        logo.translatesAutoresizingMaskIntoConstraints = false
+        logo.contentMode = .scaleAspectFit
+        cover.addSubview(logo)
+
+        view.addSubview(cover)
+        NSLayoutConstraint.activate([
+            cover.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            cover.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            cover.topAnchor.constraint(equalTo: view.topAnchor),
+            cover.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            logo.centerXAnchor.constraint(equalTo: cover.centerXAnchor),
+            logo.centerYAnchor.constraint(equalTo: cover.centerYAnchor),
+            logo.widthAnchor.constraint(equalToConstant: 168),
+            logo.heightAnchor.constraint(equalToConstant: 168)
+        ])
+        startupCoverView = cover
+    }
+
+    private func revealStartupContent() {
+        // 原生菜单和最终背景先在开屏承接层下准备好，淡出时直接展示完整主页。
+        webStartupReady = true
+        updateTheme(pendingTheme, updateSurfaces: true)
+        if #available(iOS 26.0, *) {
+            updateNativeControlVisibility()
+        }
+
+        guard let cover = startupCoverView else {
+            completeStartupTransition()
+            return
+        }
+
+        UIView.animate(
+            withDuration: 0.3,
+            delay: 0,
+            options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
+        ) {
+            cover.alpha = 0
+        } completion: { [weak self] _ in
+            cover.removeFromSuperview()
+            self?.startupCoverView = nil
+            self?.completeStartupTransition()
+        }
+    }
+
+    private func completeStartupTransition() {
+        setNeedsStatusBarAppearanceUpdate()
+        webView?.evaluateJavaScript(
+            "window.dispatchEvent(new Event('native-startup-transition-complete'))"
+        )
     }
 
     @available(iOS 26.0, *)
@@ -349,22 +420,37 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
 
     @available(iOS 26.0, *)
     private func updateNativeControlVisibility() {
-        nativeTabController?.view.isHidden = webOverlayVisible || !currentPath.hasPrefix("/tabs/")
-        historyButton?.isHidden = webOverlayVisible || !currentPath.hasPrefix("/tabs/search")
-        clearRecordsButton?.isHidden = webOverlayVisible || !currentPath.hasPrefix("/tabs/records")
-        clearHistoryButton?.isHidden = webOverlayVisible || currentPath != "/history"
-        backButton?.isHidden = webOverlayVisible || currentPath.hasPrefix("/tabs/")
+        // 开屏期间原生控件位于 WKWebView 上层，必须由 Web 明确通知开屏结束后再显示。
+        let nativeControlsHidden = !webStartupReady || webOverlayVisible
+        nativeTabController?.view.isHidden = nativeControlsHidden || !currentPath.hasPrefix("/tabs/")
+        historyButton?.isHidden = nativeControlsHidden || !currentPath.hasPrefix("/tabs/search")
+        clearRecordsButton?.isHidden = nativeControlsHidden || !currentPath.hasPrefix("/tabs/records")
+        clearHistoryButton?.isHidden = nativeControlsHidden || currentPath != "/history"
+        backButton?.isHidden = nativeControlsHidden || currentPath.hasPrefix("/tabs/")
     }
 
-    @available(iOS 26.0, *)
-    private func updateTheme(_ theme: String) {
+    private func updateTheme(_ theme: String, updateSurfaces: Bool) {
         let interfaceStyle = NativeThemePreference.interfaceStyle(for: theme)
-        let backgroundColor = NativeThemePreference.backgroundColor(for: interfaceStyle)
         overrideUserInterfaceStyle = interfaceStyle
         view.window?.overrideUserInterfaceStyle = interfaceStyle
-        view.backgroundColor = backgroundColor
-        view.window?.backgroundColor = backgroundColor
+
+        if updateSurfaces {
+            let backgroundColor = NativeThemePreference.backgroundColor(for: interfaceStyle)
+            view.backgroundColor = backgroundColor
+            view.window?.backgroundColor = backgroundColor
+            webView?.backgroundColor = backgroundColor
+            webView?.scrollView.backgroundColor = backgroundColor
+        }
         setNeedsStatusBarAppearanceUpdate()
+    }
+
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        // 原生主题可在交叉淡化前预加载，但暗色开屏消失前状态栏始终使用浅色图标。
+        guard startupCoverView == nil else { return .lightContent }
+        let style = overrideUserInterfaceStyle == .unspecified
+            ? traitCollection.userInterfaceStyle
+            : overrideUserInterfaceStyle
+        return style == .light ? .darkContent : .lightContent
     }
 
     @available(iOS 26.0, *)
@@ -388,14 +474,21 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
     }
 
     @available(iOS 26.0, *)
-    private func showNativeToast(_ message: String) {
+    private func showNativeToast(_ message: String, tone: String) {
         nativeToastView?.removeFromSuperview()
 
         var configuration = UIButton.Configuration.glass()
         configuration.title = message
-        configuration.image = UIImage(systemName: "checkmark.circle.fill")
+        let symbolName: String
+        switch tone {
+        case "error": symbolName = "exclamationmark.circle.fill"
+        case "info": symbolName = "info.circle.fill"
+        default: symbolName = "checkmark.circle.fill"
+        }
+        configuration.image = UIImage(systemName: symbolName)
         configuration.imagePadding = 7
-        configuration.baseForegroundColor = accentColor
+        // 使用动态标签色：浅色模式为黑色，暗色模式为白色。
+        configuration.baseForegroundColor = .label
         configuration.contentInsets = NSDirectionalEdgeInsets(
             top: 11,
             leading: 18,
@@ -448,16 +541,33 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
               let body = message.body as? [String: Any],
               let type = body["type"] as? String else { return }
 
-        guard #available(iOS 26.0, *) else { return }
         switch type {
         case "route":
-            if let path = body["path"] as? String { updateRoute(path) }
+            if #available(iOS 26.0, *), let path = body["path"] as? String {
+                updateRoute(path)
+            }
+        case "startup":
+            webStartupReady = body["ready"] as? Bool ?? false
+            if webStartupReady {
+                updateTheme(pendingTheme, updateSurfaces: true)
+            }
+            setNeedsStatusBarAppearanceUpdate()
+            if #available(iOS 26.0, *) {
+                updateNativeControlVisibility()
+            }
+        case "startupContentPainted":
+            revealStartupContent()
         case "overlay":
             webOverlayVisible = body["visible"] as? Bool ?? false
-            updateNativeControlVisibility()
+            if #available(iOS 26.0, *) {
+                updateNativeControlVisibility()
+            }
         case "theme":
-            updateTheme(body["theme"] as? String ?? "system")
+            pendingTheme = body["theme"] as? String ?? "system"
+            // trait 立即使用最终主题；承载层背景在开屏结束前仍固定暗色。
+            updateTheme(pendingTheme, updateSurfaces: webStartupReady)
         case "confirm":
+            guard #available(iOS 26.0, *) else { return }
             guard let action = body["action"] as? String,
                   let title = body["title"] as? String,
                   let confirmationMessage = body["message"] as? String,
@@ -469,7 +579,10 @@ final class LiquidGlassBridgeViewController: CAPBridgeViewController, WKScriptMe
                 confirmTitle: confirmTitle
             )
         case "toast":
-            if let toastMessage = body["message"] as? String { showNativeToast(toastMessage) }
+            guard #available(iOS 26.0, *) else { return }
+            if let toastMessage = body["message"] as? String {
+                showNativeToast(toastMessage, tone: body["tone"] as? String ?? "success")
+            }
         default:
             break
         }

@@ -365,16 +365,15 @@ export async function estimateFoodWithZhipu(
     fetcher
   });
   let validation = parseAndValidateEstimate(text, content);
+  const requiresCorrection =
+    !validation.parsed.success || Boolean(validation.validationError);
 
-  if (!validation.parsed.success || validation.validationError) {
+  if (requiresCorrection) {
     logInvalidEstimate(
       "Zhipu estimate requires correction",
       validation.parsed,
       validation.validationError
     );
-  }
-
-  if (!validation.parsed.success || validation.validationError) {
     // 格式或营养合理性不合格时只纠正一次，避免无限重试。
     const corrected = await createCompletion({
       apiKey,

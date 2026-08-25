@@ -3,11 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#080a0d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#080a0d" />
     <title>热量快查</title>
     <script>
-      // 在首帧绘制前恢复上次主题，避免开屏先按系统深色渲染再切换为手动浅色。
+      // 在应用脚本加载前恢复上次主题，避免主页首帧主题跳变。
       try {
         const startupTheme = localStorage.getItem("app-theme-v1");
         if (startupTheme === "light" || startupTheme === "dark") {
@@ -16,124 +15,8 @@
         }
       } catch {}
     </script>
-    <style id="startup-splash-styles">
-      html.startup-splash-active,
-      html.startup-splash-active body {
-        overflow: hidden;
-      }
-
-      html.startup-splash-active #app {
-        opacity: 0;
-      }
-
-      #app {
-        opacity: 1;
-        transition: opacity 280ms ease-out;
-      }
-
-      #startup-splash {
-        position: fixed;
-        z-index: 2147483647;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        background:
-          radial-gradient(circle at 82% 4%, rgba(255, 118, 82, 0.11), transparent 34%),
-          linear-gradient(160deg, #f3f4f6, #e9ebef);
-        opacity: 1;
-        transition: opacity 280ms ease-out;
-      }
-
-      #startup-splash picture {
-        display: grid;
-        width: clamp(140px, 38vw, 184px);
-        height: clamp(140px, 38vw, 184px);
-        place-items: center;
-      }
-
-      #startup-splash img {
-        display: block;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        filter: drop-shadow(0 12px 22px rgba(255, 87, 48, 0.18));
-      }
-
-      .startup-logo-dark {
-        display: none !important;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        #startup-splash {
-          background:
-            radial-gradient(circle at 82% 4%, rgba(255, 106, 69, 0.14), transparent 34%),
-            linear-gradient(160deg, #080a0d, #101319);
-        }
-
-        .startup-logo-light {
-          display: none !important;
-        }
-
-        .startup-logo-dark {
-          display: block !important;
-        }
-      }
-
-      html[data-theme="light"] #startup-splash {
-        background:
-          radial-gradient(circle at 82% 4%, rgba(255, 118, 82, 0.11), transparent 34%),
-          linear-gradient(160deg, #f3f4f6, #e9ebef);
-      }
-
-      html[data-theme="light"] .startup-logo-light {
-        display: block !important;
-      }
-
-      html[data-theme="light"] .startup-logo-dark {
-        display: none !important;
-      }
-
-      html[data-theme="dark"] #startup-splash {
-        background:
-          radial-gradient(circle at 82% 4%, rgba(255, 106, 69, 0.14), transparent 34%),
-          linear-gradient(160deg, #080a0d, #101319);
-      }
-
-      html[data-theme="dark"] .startup-logo-light {
-        display: none !important;
-      }
-
-      html[data-theme="dark"] .startup-logo-dark {
-        display: block !important;
-      }
-
-      html.startup-splash-leaving #startup-splash {
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      html.startup-splash-leaving #app {
-        opacity: 1;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        #app,
-        #startup-splash {
-          transition-duration: 0.01ms;
-        }
-      }
-    </style>
   </head>
   <body>
-    <script>
-      document.documentElement.dataset.splashStartedAt = String(performance.now());
-    </script>
-    <div id="startup-splash" aria-label="热量快查正在启动" role="status">
-      <picture aria-hidden="true">
-        <img class="startup-logo-light" src="/calorie-ai-logo-light.png" alt="" />
-        <img class="startup-logo-dark" src="/calorie-ai-logo-dark.png" alt="" />
-      </picture>
-    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -20,6 +20,7 @@ import { useRouter } from "vue-router";
 import { useIntakeStore } from "@/stores/intake";
 import { setNativeOverlayVisible } from "@/services/native-bridge";
 import CalorieTrendChart from "@/components/CalorieTrendChart.vue";
+import { useAppToast } from "@/composables/use-app-toast";
 import { useNativeConfirmation } from "@/composables/use-native-confirmation";
 
 const intake = useIntakeStore();
@@ -30,9 +31,8 @@ const calibrationDecrease = ref<number | null>(null);
 const calibrationNote = ref("");
 const calibrationDateKey = ref("");
 const savingCalibration = ref(false);
-const calibrationToastOpen = ref(false);
 const clearRecordsAlertOpen = ref(false);
-const recordsClearedToastOpen = ref(false);
+const appToast = useAppToast();
 
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   month: "long",
@@ -98,7 +98,7 @@ async function saveCalibration() {
       calibrationNote.value
     );
     calibrationOpen.value = false;
-    calibrationToastOpen.value = true;
+    appToast.show("校准已保存", "success");
   } finally {
     savingCalibration.value = false;
   }
@@ -106,7 +106,7 @@ async function saveCalibration() {
 
 async function clearRecords() {
   await intake.clear();
-  recordsClearedToastOpen.value = true;
+  appToast.show("记录已清空", "success");
 }
 
 const clearRecordsButtons = [
@@ -279,18 +279,13 @@ const clearRecordsButtons = [
     </ion-modal>
 
     <ion-toast
-      :is-open="calibrationToastOpen"
-      message="校准已保存"
+      class="app-toast"
+      :is-open="appToast.isOpen.value"
+      :icon="appToast.icon.value"
+      :message="appToast.message.value"
       position="top"
-      :duration="1400"
-      @did-dismiss="calibrationToastOpen = false"
-    />
-    <ion-toast
-      :is-open="recordsClearedToastOpen"
-      message="记录已清空"
-      position="top"
-      :duration="1400"
-      @did-dismiss="recordsClearedToastOpen = false"
+      :duration="appToast.duration.value"
+      @did-dismiss="appToast.dismiss"
     />
   </ion-page>
 </template>

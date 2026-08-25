@@ -32,13 +32,11 @@ async function list(): Promise<IntakeRecord[]> {
 
 export const intakeRepository = {
   list,
-  async add(record: IntakeRecord) {
-    const records = retainRecentIntakeRecords([record, ...(await list())]);
-    await Preferences.set({ key: storageKey, value: JSON.stringify(records) });
-  },
-  async remove(id: string) {
-    const records = (await list()).filter((record) => record.id !== id);
-    await Preferences.set({ key: storageKey, value: JSON.stringify(records) });
+  async save(records: IntakeRecord[]) {
+    await Preferences.set({
+      key: storageKey,
+      value: JSON.stringify(retainRecentIntakeRecords(records))
+    });
   },
   async clear() {
     await Preferences.remove({ key: storageKey });

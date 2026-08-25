@@ -1,5 +1,5 @@
 {
-  "name": "calorie-ai-demo",
+  "name": "calorie-ai",
   "private": true,
   "workspaces": [
     "mobile",
@@ -17,4 +17,3 @@
     "node": ">=22"
   }
 }
-

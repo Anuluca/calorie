@@ -4,8 +4,12 @@ import Capacitor
 enum NativeThemePreference {
     private static let key = "CapacitorStorage.app-theme-v1"
 
+    static var storedTheme: String {
+        UserDefaults.standard.string(forKey: key) ?? "system"
+    }
+
     static func interfaceStyle(for theme: String? = nil) -> UIUserInterfaceStyle {
-        switch theme ?? UserDefaults.standard.string(forKey: key) {
+        switch theme ?? storedTheme {
         case "light": return .light
         case "dark": return .dark
         default: return .unspecified
@@ -34,14 +38,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
+        // 启动背景固定暗色，但界面模式从一开始就是用户的最终主题。
+        // 否则“跟随系统”的浅色主页会先按暗色渲染，再在开屏结束时整页跳变。
         let interfaceStyle = NativeThemePreference.interfaceStyle()
+        let startupBackground = NativeThemePreference.backgroundColor(for: .dark)
         let rootViewController = LiquidGlassBridgeViewController()
         rootViewController.overrideUserInterfaceStyle = interfaceStyle
-        rootViewController.view.backgroundColor = NativeThemePreference.backgroundColor(for: interfaceStyle)
+        rootViewController.view.backgroundColor = startupBackground
 
         window = UIWindow(windowScene: windowScene)
         window?.overrideUserInterfaceStyle = interfaceStyle
-        window?.backgroundColor = NativeThemePreference.backgroundColor(for: interfaceStyle)
+        window?.backgroundColor = startupBackground
         window?.rootViewController = rootViewController
         window?.makeKeyAndVisible()
 

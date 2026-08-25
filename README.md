@@ -21,7 +21,7 @@
 
 ## 产品简介
 
-**热量快查**是一款面向日常饮食场景的跨平台热量查询与摄入记录应用。用户只需输入“炒饭”“一碗热干面”等自然语言，应用即可识别食物、估算常见份量与整份热量，并给出可能范围和可信度。
+**热量快查**是一款面向日常饮食场景的跨平台热量查询与摄入记录应用。用户可以输入或按住麦克风说出“炒饭”“一碗热干面”等自然语言，应用会识别食物、估算常见份量与整份热量，并给出可能范围和可信度。
 
 查询结果可直接加入当天记录；应用会汇总每日摄入、保存逐条明细，并允许通过运动或人工修正进行热量校准。核心记录默认保存在设备本地，不依赖账号体系，也不会在设备间同步。
 
@@ -31,7 +31,7 @@
 
 | 模块 | 能力 |
 | --- | --- |
-| AI 热量查询 | 中文自然语言输入，估算食物名称、常见份量、成品重量、总热量、可能范围与可信度 |
+| AI 热量查询 | 支持键盘和按住说话输入，估算食物名称、常见份量、成品重量、总热量、可能范围与可信度 |
 | 结果对比 | 支持“同为一份”与“同等重量（100 克）”两种口径，可锁定基准结果持续比较 |
 | 每日记录 | 一键记录查询结果，按日期汇总食物、热量与校准后的总摄入 |
 | 热量校准 | 针对任意记录日增加或减少热量，支持备注和多次校准，并保留每次明细 |
@@ -53,8 +53,8 @@
 
 | 数据 | 存储位置 | 保留策略 |
 | --- | --- | --- |
-| 查询历史 | 原生端 SQLite；Web 端 Preferences | 最多 200 条 |
-| 摄入与校准记录 | 原生端 SQLite；Web 端 Preferences | 最近 60 个自然日 |
+| 查询历史 | 当前设备 Preferences | 最多 200 条 |
+| 摄入与校准记录 | 当前设备 Preferences | 最近 60 个自然日 |
 | 主题与对比锁定 | 当前设备 Preferences | 用户主动修改或清除前保留 |
 | AI 查询缓存 | Cloudflare D1 | 7 天，缓存键包含模型与提示词版本 |
 | 意见反馈限流 | Cloudflare D1 | 仅保存限流所需的散列标识和计数 |
@@ -72,15 +72,16 @@ flowchart LR
     A -->|食物查询 / 意见反馈| F[Cloudflare Worker]
     F -->|结构化热量估算| G[智谱 GLM-4-Flash]
     F -->|查询缓存 / 反馈限流| H[Cloudflare D1]
-    B -->|历史 / 摄入 / 校准| I[SQLite]
-    E -->|开发环境持久化| J[Preferences]
+    B -->|历史 / 摄入 / 校准| I[Preferences]
+    E -->|浏览器持久化| I
 ```
 
 ### 技术栈
 
 - **客户端**：Vue 3.5、TypeScript、Ionic Vue 9、Pinia、Vue Router、Vite
 - **跨平台运行时**：Capacitor 8，目标平台为 iOS、Android 与 Web
-- **本地数据**：`@capacitor-community/sqlite` + Capacitor Preferences 降级方案
+- **本地数据**：Capacitor Preferences，Store 内存态统一批量写回
+- **原生输入**：Capgo Speech Recognition + Capacitor Haptics
 - **服务端**：Cloudflare Workers、Cloudflare D1、Cloudflare Email Service
 - **AI 服务**：智谱 `glm-4-flash-250414`，关闭深度思考并使用结构化 JSON 输出
 - **数据校验**：Zod；客户端、Worker 和 AI 响应均执行边界校验
@@ -101,6 +102,7 @@ calorie-api/
 ├── mobile/                   # Vue / Ionic / Capacitor 客户端
 │   ├── src/
 │   │   ├── components/       # 结果卡片、趋势图等通用组件
+│   │   ├── composables/       # 语音会话、Toast 与原生确认框
 │   │   ├── pages/            # 查询、记录、详情、历史、设置页面
 │   │   ├── services/         # 查询、存储、主题与原生桥接
 │   │   └── stores/           # Pinia 状态管理
@@ -186,9 +188,9 @@ npm run build
 
 `npm run build` 会构建客户端，并对 Worker 执行 TypeScript 检查。
 
-### Android APK
+### Android APK / AAB
 
-仓库提供了一键打包脚本，会依次执行 Web 构建、Capacitor 同步和 Gradle Debug 打包：
+仓库提供了一键打包脚本，会依次执行 Web 构建、Capacitor 同步和 Gradle Release 打包：
 
 ```bash
 npm run apk --workspace mobile
@@ -197,8 +199,11 @@ npm run apk --workspace mobile
 构建产物固定输出到：
 
 ```text
-mobile/outputs/android/calorie-ai-debug.apk
+mobile/outputs/android/calorie-ai-release-unsigned.apk
+mobile/outputs/android/calorie-ai-release-unsigned.aab
 ```
+
+两个产物默认均未签名，上架前必须使用发布密钥或上传密钥签名。
 
 ### iOS / Android 原生工程
 
@@ -273,6 +278,7 @@ curl -X POST http://localhost:8787/v1/food/query \
 当前版本：**v1.0**
 
 - AI 食物热量查询与估算区间
+- 按住说话输入、原生触感与提示音反馈
 - 查询历史、结果对比与对比项锁定
 - 每日摄入记录、热量校准与近 30 天趋势图
 - iOS、Android、Web 三端适配

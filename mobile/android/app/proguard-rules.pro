@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Capacitor 通过 PluginHandle 在运行时读取 @CapacitorPlugin.permissions。
+# AGP 8.13 / R8 全量优化时会错误地移除 PluginHandle 中保存的注解字段，
+# 随后把 Plugin.getPermissionStates() 折叠为必然抛出 NullPointerException。
+# 保留句柄及权限注解，确保 Release 包与 Debug 包使用相同的权限元数据。
+-keep class com.getcapacitor.PluginHandle { *; }
+-keep class com.getcapacitor.annotation.CapacitorPlugin { *; }
+-keep class com.getcapacitor.annotation.Permission { *; }
+-keepattributes AnnotationDefault,RuntimeVisibleAnnotations

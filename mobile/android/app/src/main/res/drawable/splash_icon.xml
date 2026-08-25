@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/calorie_ai_launcher_foreground"
+    android:insetLeft="18%"
+    android:insetTop="18%"
+    android:insetRight="18%"
+    android:insetBottom="18%">
+    <!-- Android 会把无背景启动图标放进 288dp 画布；内缩后图案保持在 192dp 安全区内。 -->
+</inset>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色系统主题的默认值；App 内手动主题由原生桥接即时覆盖。 -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@color/splash_background</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:colorBackground">@color/splash_background</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:statusBarColor">#080A0D</item>
+        <item name="android:navigationBarColor">#080A0D</item>
+        <item name="android:navigationBarDividerColor">#080A0D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+    </style>
+</resources>

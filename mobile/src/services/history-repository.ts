@@ -2,7 +2,7 @@ import { Preferences } from "@capacitor/preferences";
 import type { FoodQueryResult } from "@/types";
 
 const storageKey = "calorie-history-v1";
-const historyLimit = 200;
+export const HISTORY_LIMIT = 200;
 
 async function list(): Promise<FoodQueryResult[]> {
   const { value } = await Preferences.get({ key: storageKey });
@@ -10,7 +10,7 @@ async function list(): Promise<FoodQueryResult[]> {
 
   try {
     const parsed = JSON.parse(value) as FoodQueryResult[];
-    const retained = parsed.slice(0, historyLimit);
+    const retained = parsed.slice(0, HISTORY_LIMIT);
     if (retained.length !== parsed.length) {
       await Preferences.set({ key: storageKey, value: JSON.stringify(retained) });
     }
@@ -22,13 +22,11 @@ async function list(): Promise<FoodQueryResult[]> {
 
 export const historyRepository = {
   list,
-  async add(item: FoodQueryResult) {
-    const next = [item, ...(await list())].slice(0, historyLimit);
-    await Preferences.set({ key: storageKey, value: JSON.stringify(next) });
-  },
-  async remove(id: string) {
-    const next = (await list()).filter((item) => item.id !== id);
-    await Preferences.set({ key: storageKey, value: JSON.stringify(next) });
+  async save(items: FoodQueryResult[]) {
+    await Preferences.set({
+      key: storageKey,
+      value: JSON.stringify(items.slice(0, HISTORY_LIMIT))
+    });
   },
   async clear() {
     await Preferences.remove({ key: storageKey });

@@ -1,7 +1,12 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import { intakeRepository } from "@/services/intake-repository";
-import { summarizeIntakeDays, toLocalDateKey } from "@/services/intake-domain";
+import {
+  retainRecentIntakeRecords,
+  summarizeIntakeDays,
+  toLocalDateKey
+} from "@/services/intake-domain";
+import { createSerialTaskQueue } from "@/services/serial-task-queue";
 import type { FoodQueryResult, IntakeRecord } from "@/types";
 
 function createRecordId(prefix: string): string {
@@ -25,6 +30,7 @@ export const useIntakeStore = defineStore("intake", () => {
     return index;
   });
   let loadPromise: Promise<void> | null = null;
+  const enqueueMutation = createSerialTaskQueue();
 
   async function load() {
     if (ready.value) return;
@@ -43,20 +49,24 @@ export const useIntakeStore = defineStore("intake", () => {
   }
 
   async function addFood(result: FoodQueryResult) {
-    const now = Date.now();
-    const record: IntakeRecord = {
-      id: createRecordId("food"),
-      kind: "food",
-      dateKey: toLocalDateKey(now),
-      name: result.name,
-      quantityText: result.quantityText,
-      calories: result.calories,
-      sourceResultId: result.id,
-      createdAt: now
-    };
+    await enqueueMutation(async () => {
+      await load();
+      const now = Date.now();
+      const record: IntakeRecord = {
+        id: createRecordId("food"),
+        kind: "food",
+        dateKey: toLocalDateKey(now),
+        name: result.name,
+        quantityText: result.quantityText,
+        calories: result.calories,
+        sourceResultId: result.id,
+        createdAt: now
+      };
 
-    await intakeRepository.add(record);
-    records.value = [record, ...records.value];
+      const next = retainRecentIntakeRecords([record, ...records.value]);
+      await intakeRepository.save(next);
+      records.value = next;
+    });
   }
 
   async function addAdjustment(
@@ -65,29 +75,41 @@ export const useIntakeStore = defineStore("intake", () => {
     decreaseCalories: number,
     note: string
   ) {
-    const record: IntakeRecord = {
-      id: createRecordId("adjustment"),
-      kind: "adjustment",
-      dateKey,
-      calories: increaseCalories - decreaseCalories,
-      increaseCalories,
-      decreaseCalories,
-      note: note.trim() || "热量校准",
-      createdAt: Date.now()
-    };
+    await enqueueMutation(async () => {
+      await load();
+      const record: IntakeRecord = {
+        id: createRecordId("adjustment"),
+        kind: "adjustment",
+        dateKey,
+        calories: increaseCalories - decreaseCalories,
+        increaseCalories,
+        decreaseCalories,
+        note: note.trim() || "热量校准",
+        createdAt: Date.now()
+      };
 
-    await intakeRepository.add(record);
-    records.value = [record, ...records.value];
+      const next = retainRecentIntakeRecords([record, ...records.value]);
+      await intakeRepository.save(next);
+      records.value = next;
+    });
   }
 
   async function clear() {
-    await intakeRepository.clear();
-    records.value = [];
+    await enqueueMutation(async () => {
+      await load();
+      await intakeRepository.clear();
+      records.value = [];
+      ready.value = true;
+    });
   }
 
   async function remove(id: string) {
-    await intakeRepository.remove(id);
-    records.value = records.value.filter((record) => record.id !== id);
+    await enqueueMutation(async () => {
+      await load();
+      const next = records.value.filter((record) => record.id !== id);
+      await intakeRepository.save(next);
+      records.value = next;
+    });
   }
 
   function recordsForDay(dateKey: string) {
